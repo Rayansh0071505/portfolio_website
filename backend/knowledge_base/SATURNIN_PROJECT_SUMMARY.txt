@@ -1,0 +1,177 @@
+===============================================
+SATURNIN - PROJECT SUMMARY
+===============================================
+
+PROJECT PERIOD: November 2025 - January 2026
+ROLE: Founding AI Engineer
+WEBSITE: https://www.saturnin.io/
+
+
+WHAT IS SATURNIN?
+-----------------
+Saturnin is an AI-powered investor intelligence platform for venture capital firms,
+private equity firms, and institutional investors. It provides highly intelligent
+automated reports to analyze and monitor portfolio companies end-to-end using AI.
+
+
+THE PROBLEM IT SOLVES
+----------------------
+Investors (VCs, private equity, angel investors) need to:
+- Analyze companies comprehensively without spending 10+ hours per deal
+- Monitor portfolio companies continuously with real-time intelligence
+- Get intelligent reports that analyze all important factors: market size, competitive
+  landscape, financials, team quality, growth potential, unit economics
+- Determine company performance and predict future success
+- Make data-driven investment decisions
+
+
+THE SOLUTION
+------------
+An AI analyst that:
+- Remembers every company forever (persistent portfolio memory)
+- Performs precise financial analysis (no calculation errors)
+- Synthesizes private portfolio data with real-time market intelligence
+- Applies the investor's personal investment thesis to every deal
+- Enables cross-company queries ("Show all SaaS companies with ARR > $1M")
+- Automates due diligence (pitch deck analysis, competitor research, market analysis)
+- Available 24/7 with 99.9% uptime
+
+
+WHAT I DEVELOPED
+-----------------
+
+1. Multi-Agent RAG System
+   - 4 specialized AI agents:
+     * Investor Assistant - Company research with web search, pitch deck analysis
+     * Finance Assistant - Excel/CSV analysis with precise calculations
+     * Book Training AI - Learn from investment books and apply principles
+     * Trained AI - Personalized analyst based on investor thesis
+   - Tools: LangGraph, LangChain, Google Vertex AI (Gemini), Groq (LLaMA)
+
+2. RAG Pipeline
+   - Semantic search across pitch decks, websites, financial models
+   - Pinecone vector database with 2 indexes (documents + books)
+   - HuggingFace embeddings (sentence-transformers/all-MiniLM-L6-v2)
+   - Sub-second retrieval, zero hallucinations
+
+3. AWS Infrastructure
+   - Deployed on ECS Fargate (serverless containers)
+   - 99.9% uptime using multi-model fallback (Gemini → Groq)
+   - CloudFront CDN, Application Load Balancer, VPC with NAT Gateways
+   - Auto-scaling 1-10 tasks
+   - CI/CD via GitHub Actions
+
+4. Private LLM Hosting
+   - Hosted open-source models (Qwen 3, Kimi K2 thinking) on private servers
+   - Used vLLM + Ray for sensitive investor data processing
+   - Data sovereignty compliance
+
+5. Real-Time Intelligence
+   - Web search integration (Tavily API)
+   - Web scraping (Playwright)
+   - Competitor analysis
+   - Market research automation
+
+6. Financial Analysis System
+   - Python calculator tool for precise math (no LLM errors)
+   - Multi-sheet Excel processing
+   - Automated financial model analysis
+   - Risk assessment
+
+7. Full-Stack Platform
+   - React 18 + TypeScript frontend
+   - FastAPI backend (Python 3.12)
+   - MongoDB Atlas for company data storage
+   - Google Cloud Storage for documents
+   - JWT authentication
+
+
+TECH STACK USED
+----------------
+
+Backend:
+- Python 3.12
+- FastAPI (async web framework)
+- Uvicorn (ASGI server)
+
+AI/ML:
+- LangChain & LangGraph (multi-agent orchestration)
+- Google Vertex AI Gemini 2.5 (Pro, Flash, Flash Lite)
+- Groq API (LLaMA 3.3 70B) - fallback for 99.9% uptime
+- Qwen 3 + Kimi K2 - private servers (vLLM + Ray)
+- HuggingFace sentence-transformers (embeddings)
+- Pinecone (vector database)
+- Tavily API (web search)
+- Playwright (web scraping)
+
+Databases:
+- MongoDB Atlas (primary database)
+- Motor (async MongoDB driver)
+- Pinecone (vector database for RAG)
+
+Cloud Storage:
+- Google Cloud Storage (GCS)
+
+Data Processing:
+- pandas (Excel/CSV)
+- PyPDF / PyMuPDF (PDF extraction)
+- BeautifulSoup4 (HTML parsing)
+- pdf2image (PDF conversion)
+
+Authentication:
+- JWT (python-jose + cryptography)
+- bcrypt (password hashing)
+- Pydantic (validation)
+
+Frontend:
+- React 18
+- TypeScript
+- Vite 5
+- Tailwind CSS 3.4
+- React Router v6
+- Axios
+- Lucide React (icons)
+- react-markdown
+
+AWS Infrastructure:
+- ECS Fargate (container orchestration)
+- ECR (container registry)
+- Application Load Balancer (ALB)
+- CloudFront (CDN)
+- S3 (static hosting)
+- VPC + NAT Gateways
+- CloudWatch (logging)
+- Systems Manager (secrets)
+
+DevOps:
+- Docker (containerization)
+- GitHub Actions (CI/CD)
+- Terraform (Infrastructure as Code)
+
+Private Server Infrastructure:
+- vLLM (LLM inference)
+- Ray (distributed computing)
+- Qwen 3 (open-source LLM)
+- Kimi K2 thinking (reasoning model)
+
+
+KEY TECHNICAL ACHIEVEMENTS
+---------------------------
+- Built 4 specialized AI agents with tool orchestration
+- Architected 99.9% uptime with multi-model fallback
+- Hosted private LLMs for sensitive data (vLLM + Ray)
+- Achieved 40-60% faster response times via parallel tool execution
+- Deployed production RAG pipeline with zero hallucinations
+- Zero-downtime deployments on AWS ECS Fargate
+- Precise financial calculations (Python, not LLM)
+- Real-time market intelligence synthesis
+
+
+PROJECT IMPACT
+---------------
+- Saves investors 10-20 hours per deal with automated due diligence
+- Persistent portfolio memory (never forgets company data)
+- Enables instant cross-portfolio queries
+- Provides 24/7 AI analyst with 99.9% uptime
+- Processes sensitive data securely on private infrastructure
+- Combines portfolio data with real-time market intelligence
