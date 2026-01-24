@@ -18,6 +18,21 @@ export default function Experience() {
       ]
     },
     {
+      title: "Founding AI Engineer",
+      company: "Saturnin",
+      location: "Remote",
+      period: "Nov 2025 – Jan 2026",
+      achievements: [
+        "Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Google Vertex AI (Gemini)",
+        "Architected AWS ECS Fargate deployment with 99.9% uptime using multi-model fallback (Gemini → Groq LLaMA)",
+        "Hosted open-source models (Qwen 3, Kimi K2 thinking) on private servers using vLLM and Ray for sensitive data processing",
+        "Developed persistent portfolio intelligence platform enabling cross-company queries and automated due diligence",
+        "Created 4 specialized AI agents: investor research, financial analysis, book training, and personalized analyst",
+        "Designed RAG pipeline with semantic search across pitch decks, websites, and investment books (Pinecone vector DB)",
+        "Implemented real-time market intelligence synthesis with web search, scraping, and precise financial calculations"
+      ]
+    },
+    {
       title: "AI / Machine Learning Engineer",
       company: "Ooodles",
       location: "United Kingdom",
