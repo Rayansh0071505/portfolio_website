@@ -23,14 +23,6 @@ export default function Education() {
                 <p className="text-gray-400">Chennai, India</p>
               </div>
             </div>
-            <div className="mt-6 pt-6 border-t border-slate-700/50">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">CGPA:</span>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">
-                  8.36
-                </span>
-              </div>
-            </div>
           </div>
 
           <div className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm rounded-2xl p-8 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20">
