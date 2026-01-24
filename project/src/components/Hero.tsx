@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { SparklesIcon } from '@heroicons/react/24/solid';
 import { GradientMesh } from './hero/GradientMesh';
 import { ParticleBackground } from './hero/ParticleBackground';
 import { AnimatedProfileImage } from './hero/AnimatedProfileImage';
@@ -85,6 +87,16 @@ export default function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9, duration: 0.8 }}
           >
+            {/* Chat with AI Button - PRIMARY CTA */}
+            <Link to="/chat">
+              <MagneticButton variant="primary" strength={0.4}>
+                <div className="flex items-center gap-2">
+                  <SparklesIcon className="w-5 h-5" />
+                  <span>Chat with Rayansh AI</span>
+                </div>
+              </MagneticButton>
+            </Link>
+
             <MagneticButton
               href="mailto:rayanshsrivastava.ai@gmail.com"
               variant="primary"
@@ -94,7 +106,7 @@ export default function Hero() {
             </MagneticButton>
             <MagneticButton
               href="#experience"
-              variant="secondary"
+              variant="primary"
               strength={0.3}
             >
               View My Work

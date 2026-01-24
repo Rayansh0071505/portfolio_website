@@ -1,4 +1,7 @@
 import { Brain, Code, Database, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 
 export default function About() {
   const highlights = [
@@ -34,6 +37,21 @@ export default function About() {
                 <p className="text-gray-300 font-medium">{item.text}</p>
               </div>
             ))}
+          </div>
+
+          {/* AI Chat CTA */}
+          <div className="mt-12 text-center">
+            <p className="text-slate-400 mb-4">Want to know more about my experience?</p>
+            <Link to="/chat">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-xl shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all"
+              >
+                <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                <span>Ask My AI Anything</span>
+              </motion.button>
+            </Link>
           </div>
         </div>
       </div>
