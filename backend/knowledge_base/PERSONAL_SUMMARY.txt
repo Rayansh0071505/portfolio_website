@@ -1,0 +1,185 @@
+===============================================
+RAYANSH SRIVASTAVA - PERSONAL SUMMARY
+===============================================
+
+BASIC INFORMATION
+=================
+Full Name: Rayansh Srivastava
+Title: AI/ML Solution Engineer | Founding AI Engineer
+Email: rayanshsrivastava.ai@gmail.com
+LinkedIn: https://www.linkedin.com/in/rayansh-srivastava-419951219/
+GitHub: https://github.com/Rayansh0071505
+Portfolio: https://rayansh-portfolio.com
+
+PROFESSIONAL SUMMARY
+====================
+I am an AI/ML Solution Engineer with 5+ years of hands-on experience building production AI systems for startups across 3 continents. My expertise lies in translating complex business problems into scalable, end-to-end AI solutions that deliver real business value.
+
+Core Strength: End-to-end AI solution design and implementation from concept to production deployment.
+
+WORK EXPERIENCE (TIMELINE)
+===========================
+
+1. Saturnin (Nov 2025 - Jan 2026)
+   Position: Founding AI Engineer
+   Location: Remote
+   Summary: Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Vertex AI. Hosted open-source models (Qwen 3, Kimi K2) on private servers using vLLM and Ray.
+
+2. Everest Commerce Group (Mar 2025 - Nov 2025)
+   Position: AI Solution Engineer
+   Location: Remote
+   Summary: Designed Peak OS platform and Peak Ads automation system. Built multi-agent orchestration using LangChain and Vertex AI. Worked with MongoDB and BigQuery for data pipelines.
+
+3. Ooodles (Apr 2024 - Mar 2025)
+   Position: AI/Machine Learning Engineer
+   Location: Remote
+   Summary: Built product catalog pipeline for e-commerce automation. Developed chatbot systems and vetting tools using LangChain and OpenAI.
+
+4. Moe-Assist (Dec 2023 - May 2024)
+   Position: AI/Machine Learning Engineer (Team Lead)
+   Location: Remote
+   Summary: Led engineering team across 3 time zones (EST, CET, IST). Built influencer discovery platform with custom algorithms and RAG-powered chatbot.
+
+5. Playback (Jan 2023 - Dec 2023)
+   Position: ML Engineer (Project Lead)
+   Location: Remote
+   Summary: Developed proprietary video generation engine using diffusion models (3x faster than commercial). Built voice cloning system with 80-90% similarity using 10-15 min audio samples.
+
+CERTIFICATIONS
+==============
+1. TensorFlow Developer Certification
+   - Issued by: Google
+   - Credential: Official TensorFlow certification program
+
+2. Data Analysis Using Python Certification
+   - Issued by: IBM
+   - Credential: IBM Professional Certificate
+
+3. LinkedIn Top Voice - AI/ML
+   - Recognition: 2 times
+   - Achievement: Recognized as thought leader in AI/ML space
+
+CORE TECHNICAL SKILLS
+======================
+
+Programming Languages:
+- Python (Expert level)
+- C++ (Proficient level)
+
+Machine Learning:
+- Deep Learning, NLP, Computer Vision, Time Series Analysis
+- LLMs (GPT-4, Gemini, Claude, LLaMA, Mistral)
+- Generative AI, GANs, Statistical ML
+
+Frameworks & Libraries:
+- LangChain, LangGraph, LlamaIndex (Agent frameworks)
+- PyTorch, TensorFlow (Deep Learning)
+- FastAPI, Streamlit (Web frameworks)
+- Scikit-learn, OpenCV (ML libraries)
+
+Cloud & Infrastructure:
+- AWS: Lambda, ECS, EC2, S3, CloudFront, CloudWatch
+- GCP: Vertex AI, BigQuery, Cloud Storage
+- Azure: OpenAI, Cognitive Services
+- Render Cloud (Hosting)
+
+ML-Ops & DevOps:
+- Docker, Kubernetes, GitHub Actions
+- Ray, vLLM (Distributed computing & LLM inference)
+- MLFlow, DVC (Experiment tracking)
+- Airflow (Data orchestration)
+- Grafana (Monitoring)
+
+Databases & Vector Stores:
+- Vector DBs: Pinecone, FAISS, Elasticsearch
+- NoSQL: MongoDB, Redis
+- SQL: PostgreSQL, BigQuery
+
+Generative AI Tools:
+- OpenAI GPT Models (GPT-3.5, GPT-4)
+- Vertex AI (Gemini)
+- AWS Bedrock
+- Azure OpenAI
+- Groq (LLaMA 3.3)
+- Hugging Face Transformers
+- RAG Pipelines (Retrieval-Augmented Generation)
+
+KEY ACHIEVEMENTS
+================
+- Built 20+ autonomous AI agents across different domains
+- Led engineering teams across 3 time zones simultaneously (EST, CET, IST)
+- Deployed systems handling 10,000+ daily interactions
+- Achieved 99.9% uptime on production systems
+- Developed proprietary diffusion models 3x faster than commercial alternatives
+- Built voice cloning system with 80-90% similarity using 10-15 min audio
+- Saved organizations 80+ hours/week in manual work
+- Reduced operational costs by 25-35%
+- Improved customer satisfaction by 30%+
+
+COMMUNICATION SKILLS
+====================
+- Strong ability to translate technical concepts to non-technical audiences
+- Experience presenting to product, operations, and leadership teams
+- Conducted client demos and stakeholder presentations
+- Cross-team collaboration and alignment
+- Documentation and architecture diagrams
+
+LEADERSHIP EXPERIENCE
+=====================
+- Team Lead at Moe-Assist: Managed distributed team across 3 time zones
+- Mentored junior engineers and established best practices
+- Led technical direction and problem resolution
+- High team satisfaction and zero major incidents
+- Coordinated with product managers and senior architects
+
+WORK PHILOSOPHY
+===============
+- Problem-first approach: Deep understanding of business problems before technology selection
+- End-to-end ownership: From problem definition to production deployment
+- Quality focus: Production-ready systems from day 1
+- People-centric: Strong communication and collaboration
+- Learning-oriented: Continuous improvement and growth mindset
+
+AVAILABILITY
+============
+Work Arrangement: Remote (global time zones)
+Work Ethic: Dedicated, passionate, goes above and beyond
+Commitment: Long-term, continuous improvement focused
+
+WHAT I BRING TO THE TABLE
+==========================
+1. Technical Expertise:
+   - Full-stack AI development (frontend, backend, data pipelines, cloud)
+   - Deep knowledge of LLMs, RAG systems, and multi-agent orchestration
+   - Production ML systems with scalability and reliability
+
+2. Business Acumen:
+   - Translate business needs into AI solutions
+   - Focus on ROI and value creation
+   - Pragmatic approach to technology selection
+
+3. Leadership & Communication:
+   - Lead distributed teams effectively
+   - Communicate clearly with technical and non-technical stakeholders
+   - Build consensus and drive alignment
+
+4. Proven Track Record:
+   - 5+ years of consistent delivery
+   - Multiple successful projects across different domains
+   - High-quality, production-ready systems
+
+LOOKING FOR
+===========
+- Roles with end-to-end ownership and technical leadership
+- Challenging AI/ML problems with real business impact
+- Mission-driven companies with strong engineering culture
+- Opportunities for learning and growth
+- High-quality teams focused on innovation
+
+TWO-LINE SUMMARY
+================
+I am an AI/ML Solution Engineer with 5+ years of experience building end-to-end AI systems for startups across 3 continents. I specialize in transforming complex business problems into scalable, production-ready AI solutions using LLMs, RAG systems, and multi-agent orchestration.
+
+ELEVATOR PITCH
+==============
+I'm Rayansh Srivastava, an AI/ML engineer passionate about building intelligent systems that solve real problems. Over the past 5+ years, I've worked with startups across 3 continents, developing everything from multi-agent RAG systems at Saturnin to proprietary video generation engines at Playback. I specialize in LangChain, LangGraph, and production ML systems, and I've led teams across multiple time zones. I'm driven by the challenge of translating complex business needs into elegant AI solutions that deliver measurable value. Whether it's building 20+ autonomous agents or achieving 99.9% uptime on production systems, I focus on quality, scalability, and real-world impact.
