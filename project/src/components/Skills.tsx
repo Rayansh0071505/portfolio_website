@@ -6,8 +6,28 @@ import { FadeInView } from './animations/FadeInView';
 export default function Skills() {
   const skillCategories = [
     {
+      category: "Generative AI Tools",
+      skills: ["OpenAI GPT Models", "AWS Bedrock", "Azure OpenAI", "Vertex AI (Gemini)", "Hugging Face Transformers", "Open-Source LLMs (LLaMA, Mistral, Falcon)", "LangChain", "LangGraph", "LlamaIndex", "RAG Pipelines", "Pinecone", "FAISS"]
+    },
+    {
       category: "Machine Learning",
       skills: ["Deep Learning", "NLP", "Computer Vision", "Time Series Analysis", "LLMs", "Generative AI", "Statistical Machine Learning", "GANs"]
+    },
+    {
+      category: "ML-OPS",
+      skills: ["AWS (Cloud & Serverless)", "CI/CD", "Docker", "Render Cloud", "Grafana", "GitHub Actions", "GCP", "Azure", "MLFlow", "EC2", "ECS", "Lambda", "Airflow", "DVC", "Ray", "vllm"]
+    },
+    {
+      category: "Solution Engineering",
+      skills: ["Business Problem Mapping", "AI Solution Design", "System Architecture", "Stakeholder Alignment", "Technical Consulting", "Product Strategy", "Workflow Design", "AI Transformation"]
+    },
+    {
+      category: "Automation",
+      skills: ["Workflow Automation", "Multi-Agent Systems", "Process Automation", "AI Orchestration"]
+    },
+    {
+      category: "Frameworks, Hosting & Libraries",
+      skills: ["TensorFlow", "OpenCV", "Scikit-learn", "FastAPI", "Streamlit", "Pytorch"]
     },
     {
       category: "Languages",
@@ -16,26 +36,6 @@ export default function Skills() {
     {
       category: "Databases",
       skills: ["MongoDB", "Big Query", "SQL"]
-    },
-    {
-      category: "Solution Engineering",
-      skills: ["Business Problem Mapping", "AI Solution Design", "System Architecture", "Stakeholder Alignment", "Technical Consulting", "Product Strategy", "Workflow Design", "AI Transformation"]
-    },
-    {
-      category: "ML-OPS",
-      skills: ["AWS (Cloud & Serverless)", "CI/CD", "Docker", "Render Cloud", "Grafana", "GitHub Actions", "GCP", "Azure", "MLFlow", "EC2", "ECS", "Lambda", "Airflow", "DVC", "Ray", "vllm"]
-    },
-    {
-      category: "Automation",
-      skills: ["Workflow Automation", "Multi-Agent Systems", "Process Automation", "AI Orchestration"]
-    },
-    {
-      category: "Generative AI Tools",
-      skills: ["OpenAI GPT Models", "AWS Bedrock", "Azure OpenAI", "Vertex AI (Gemini)", "Hugging Face Transformers", "Open-Source LLMs (LLaMA, Mistral, Falcon)", "LangChain", "LangGraph", "LlamaIndex", "RAG Pipelines", "Pinecone", "FAISS"]
-    },
-    {
-      category: "Frameworks, Hosting & Libraries",
-      skills: ["TensorFlow", "OpenCV", "Scikit-learn", "FastAPI", "Streamlit", "Pytorch"]
     },
     {
       category: "Product Management",
