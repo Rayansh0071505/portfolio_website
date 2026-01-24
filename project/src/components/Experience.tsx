@@ -3,6 +3,21 @@ import { Building2, MapPin } from 'lucide-react';
 export default function Experience() {
   const experiences = [
     {
+      title: "Founding AI Engineer",
+      company: "Saturnin",
+      location: "Remote",
+      period: "Nov 2025 – Jan 2026",
+      achievements: [
+        "Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Google Vertex AI (Gemini)",
+        "Architected AWS ECS Fargate deployment with 99.9% uptime using multi-model fallback (Gemini → Groq LLaMA)",
+        "Hosted open-source models (Qwen 3, Kimi K2 thinking) on private servers using vLLM and Ray for sensitive data processing",
+        "Developed persistent portfolio intelligence platform enabling cross-company queries and automated due diligence",
+        "Created 4 specialized AI agents: investor research, financial analysis, book training, and personalized analyst",
+        "Designed RAG pipeline with semantic search across pitch decks, websites, and investment books (Pinecone vector DB)",
+        "Implemented real-time market intelligence synthesis with web search, scraping, and precise financial calculations"
+      ]
+    },
+    {
       title: "AI Solution Engineer",
       company: "Everest Commerce Group",
       location: "Netherlands",
@@ -74,21 +89,17 @@ export default function Experience() {
         </h2>
 
         <div className="relative">
-          <div className="absolute left-0 md:left-1/2 transform md:-translate-x-1/2 h-full w-0.5 bg-gradient-to-b from-blue-500 to-teal-500"></div>
+          <div className="absolute left-0 md:left-8 h-full w-0.5 bg-gradient-to-b from-blue-500 to-teal-500"></div>
 
           {experiences.map((exp, index) => (
             <div
               key={index}
-              className={`relative mb-16 ${
-                index % 2 === 0 ? 'md:pr-1/2 md:text-right' : 'md:pl-1/2 md:ml-auto'
-              }`}
+              className="relative mb-16 md:pl-20"
             >
-              <div className="absolute left-0 md:left-1/2 transform md:-translate-x-1/2 w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-teal-500 border-4 border-slate-950 shadow-lg shadow-blue-500/50"></div>
+              <div className="absolute left-0 md:left-[1.75rem] w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-teal-500 border-4 border-slate-950 shadow-lg shadow-blue-500/50"></div>
 
               <div
-                className={`ml-12 md:ml-0 ${
-                  index % 2 === 0 ? 'md:mr-12' : 'md:ml-12'
-                } bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm rounded-2xl p-8 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.02]`}
+                className="ml-12 md:ml-0 bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm rounded-2xl p-8 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.02]"
               >
                 <div className="flex items-start gap-3 mb-4">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-teal-500/20 flex items-center justify-center flex-shrink-0">
