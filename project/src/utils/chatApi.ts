@@ -16,6 +16,7 @@ export interface ChatResponse {
   timestamp: string;
   response_time: string;
   model: string;
+  follow_up?: string;
 }
 
 /**
