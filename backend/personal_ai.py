@@ -125,7 +125,7 @@ def ensure_google_credentials():
 
 
 def get_primary_llm():
-    """Get Gemini LLM (lazy load with Google credentials)"""
+    """Get Vertex AI Gemini as primary for user-facing chat (best quality)"""
     global _primary_llm
     if _primary_llm is None:
         ensure_google_credentials()
@@ -138,12 +138,12 @@ def get_primary_llm():
             timeout=30,
             max_retries=0,
         )
-        logger.info("✅ Vertex AI Gemini initialized")
+        logger.info("✅ Vertex AI Gemini initialized (PRIMARY - Chat)")
     return _primary_llm
 
 
 def get_backup_llm():
-    """Get Groq LLM (lazy load)"""
+    """Get Groq LLM as backup for chat (fallback if Vertex AI fails)"""
     global _backup_llm
     if _backup_llm is None:
         groq_api_key = os.getenv("GROQ_API_KEY")
@@ -158,7 +158,7 @@ def get_backup_llm():
             max_retries=0,
             timeout=30
         )
-        logger.info("✅ Groq LLM initialized")
+        logger.info("✅ Groq LLM initialized (BACKUP - Chat)")
     return _backup_llm
 
 
@@ -248,13 +248,20 @@ async def search_rayansh_knowledge(query: str) -> str:
 # SYSTEM PROMPT - Strict Guardrails
 # ============================================================================
 
-SYSTEM_PROMPT = """You are Rayansh Srivastava's  AI form. You represent Rayansh in conversations.
+SYSTEM_PROMPT = """You are Rayansh Srivastava's AI form. You represent Rayansh in conversations.
 
 QUICK REFERENCE (Always available - no search needed):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Name: Rayansh Srivastava
 Title: AI/ML Solution Engineer | Founding AI Engineer
 Experience: 5+ years across startups on 3 continents
+
+IMPORTANT: When asked "tell me about yourself" or similar intro questions, provide a comprehensive overview covering:
+- Current role and experience highlights
+- Recent companies worked at (2-3 most recent)
+- Core expertise areas (2-3 key skills)
+- Notable achievements with numbers/metrics
+Keep intro responses substantial (3-4 paragraphs) to give good first impression.
 
 Companies (Most Recent to Oldest):
 1. Saturnin (Nov 2025 - Jan 2026) - Founding AI Engineer
@@ -358,10 +365,10 @@ def create_rayansh_agent(use_backup: bool = False):
     try:
         if use_backup:
             llm = get_backup_llm()
-            logger.info("🔄 Using backup LLM (Groq)")
+            logger.info("🔄 Using backup LLM (Groq) for chat")
         else:
             llm = get_primary_llm()
-            logger.info("🚀 Using primary LLM (Vertex AI)")
+            logger.info("🚀 Using primary LLM (Vertex AI) for chat")
     except Exception as e:
         logger.error(f"❌ Error initializing LLM: {str(e)}")
         if not use_backup:
@@ -406,7 +413,7 @@ class RayanshAI:
         except Exception as e:
             logger.error(f"❌ Failed to initialize agent: {str(e)}")
             if not self.use_backup:
-                logger.info("🔄 Retrying with backup LLM...")
+                logger.info("🔄 Retrying with backup LLM (Groq)...")
                 self.use_backup = True
                 self.agent = create_rayansh_agent(use_backup=True)
 
@@ -502,7 +509,7 @@ class RayanshAI:
 
             # Fallback to backup LLM if primary fails
             if not self.use_backup:
-                logger.info("🔄 Primary LLM failed, switching to backup...")
+                logger.info("🔄 Primary LLM (Vertex AI) failed, switching to backup (Groq)...")
                 self.use_backup = True
                 self.agent = create_rayansh_agent(use_backup=True)
                 return await self.chat(message, session_id, user_name)

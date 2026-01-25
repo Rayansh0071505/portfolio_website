@@ -1,2 +1,8 @@
 .claude
 .env
+
+# Security files (generated at runtime)
+backend/blocked_ips.json
+backend/rate_limits.json
+backend/session_limits.json
+backend/daily_quota.json

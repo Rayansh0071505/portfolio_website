@@ -3,7 +3,7 @@
  */
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowLeftIcon, SparklesIcon } from '@heroicons/react/24/solid';
+import { ArrowLeftIcon } from '@heroicons/react/24/solid';
 import ChatInterface from './chat/ChatInterface';
 
 export default function ChatWithAI() {
@@ -43,33 +43,9 @@ export default function ChatWithAI() {
               </h1>
               <p className="text-blue-100 text-sm flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                Online • Powered by Vertex AI & Groq
+                Online
               </p>
             </div>
-          </div>
-        </div>
-
-        <div className="hidden md:block text-white text-sm">
-          <p className="text-blue-100">Ask me anything about my:</p>
-          <p className="font-medium">Experience • Projects • Skills • Background</p>
-        </div>
-      </motion.div>
-
-      {/* Info Banner */}
-      <motion.div
-        initial={{ y: -10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800 px-6 py-3"
-      >
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <SparklesIcon className="w-4 h-4 text-blue-400" />
-            <span>
-              This AI represents Rayansh Srivastava with{' '}
-              <span className="text-blue-400 font-medium">zero hallucination</span> - all
-              responses are verified from the knowledge base
-            </span>
           </div>
         </div>
       </motion.div>
@@ -80,7 +56,7 @@ export default function ChatWithAI() {
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="h-[calc(100vh-160px)] bg-slate-900/30 border-x border-slate-800"
+          className="h-[calc(100vh-120px)] bg-slate-900/30 border-x border-slate-800"
         >
           <ChatInterface mode="full" />
         </motion.div>
@@ -88,11 +64,7 @@ export default function ChatWithAI() {
 
       {/* Footer */}
       <div className="bg-slate-900 border-t border-slate-800 px-6 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Built with{' '}
-            <span className="text-blue-400">LangChain, LangGraph, Vertex AI & Pinecone</span>
-          </p>
+        <div className="max-w-6xl mx-auto flex items-center justify-center text-sm text-slate-500">
           <p className="text-slate-600">
             © 2026 Rayansh Srivastava • AI-Powered Portfolio
           </p>
