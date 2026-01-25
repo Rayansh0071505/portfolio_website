@@ -17,6 +17,7 @@ export default function ChatInterface({ mode = 'full' }: ChatInterfaceProps) {
   const [sessionId] = useState(() => generateSessionId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Welcome message
   useEffect(() => {
@@ -33,6 +34,26 @@ export default function ChatInterface({ mode = 'full' }: ChatInterfaceProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Prevent scroll propagation to parent
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isAtTop = scrollTop === 0;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+      // Prevent scroll propagation if not at edges
+      if ((e.deltaY < 0 && !isAtTop) || (e.deltaY > 0 && !isAtBottom)) {
+        e.stopPropagation();
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // End session when component unmounts or user leaves page
   useEffect(() => {
@@ -82,6 +103,18 @@ export default function ChatInterface({ mode = 'full' }: ChatInterfaceProps) {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // If there's a follow-up message, add it after a short delay
+      if (response.follow_up) {
+        setTimeout(() => {
+          const followUpMessage: ChatMessage = {
+            role: 'assistant',
+            content: cleanMessage(response.follow_up!),
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, followUpMessage]);
+        }, 1000); // 1 second delay for natural flow
+      }
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: ChatMessage = {
@@ -106,7 +139,12 @@ export default function ChatInterface({ mode = 'full' }: ChatInterfaceProps) {
   return (
     <div className="flex flex-col h-full bg-slate-950">
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+        style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+        onWheel={(e) => e.stopPropagation()}
+      >
         <AnimatePresence initial={false}>
           {messages.map((message, index) => (
             <motion.div
