@@ -83,3 +83,20 @@ export async function getStatus(): Promise<any> {
 export function generateSessionId(): string {
   return `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 }
+
+/**
+ * End a chat session and trigger email summary
+ */
+export async function endSession(sessionId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/api/chat/end-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+  } catch (error) {
+    console.error('Error ending session:', error);
+  }
+}

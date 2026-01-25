@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PaperAirplaneIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
-import { sendMessage, generateSessionId, type ChatMessage } from '../../utils/chatApi';
+import { sendMessage, generateSessionId, endSession, type ChatMessage } from '../../utils/chatApi';
 
 interface ChatInterfaceProps {
   mode?: 'full' | 'bubble';
@@ -33,6 +33,23 @@ export default function ChatInterface({ mode = 'full' }: ChatInterfaceProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // End session when component unmounts or user leaves page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      endSession(sessionId);
+    };
+
+    // Add event listener for page unload
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup function - runs when component unmounts
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Send end session request
+      endSession(sessionId);
+    };
+  }, [sessionId]);
 
   // Clean markdown formatting from messages
   const cleanMessage = (text: string) => {
