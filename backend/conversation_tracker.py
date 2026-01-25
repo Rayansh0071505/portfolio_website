@@ -1,13 +1,175 @@
 """
 Conversation Tracker - Tracks user interactions and sends email summaries
+Uses Groq (primary) and Vertex AI (backup) for generating email summaries
 """
 import os
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime
 import requests
+import base64
+import json
+import tempfile
+from langchain_groq import ChatGroq
+from langchain_google_vertexai import ChatVertexAI
+from langchain_core.messages import SystemMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# AI MODELS FOR EMAIL SUMMARY GENERATION
+# ============================================================================
+
+_summary_groq_llm = None
+_summary_vertex_llm = None
+_google_creds_loaded_summary = False
+
+
+def get_summary_groq_llm():
+    """Get Groq LLM for email summaries (PRIMARY - Free)"""
+    global _summary_groq_llm
+    if _summary_groq_llm is None:
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if not groq_api_key:
+            raise ValueError("GROQ_API_KEY environment variable not set")
+
+        _summary_groq_llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            temperature=0.3,
+            max_tokens=2048,
+            groq_api_key=groq_api_key,
+            max_retries=1,
+            timeout=30
+        )
+        logger.info("✅ Groq LLM initialized for email summaries (PRIMARY)")
+    return _summary_groq_llm
+
+
+def get_summary_vertex_llm():
+    """Get Vertex AI Gemini for email summaries (BACKUP)"""
+    global _summary_vertex_llm, _google_creds_loaded_summary
+
+    if _summary_vertex_llm is None:
+        # Load Google credentials if not already loaded
+        if not _google_creds_loaded_summary:
+            google_key_base64 = os.getenv("GOOGLE_KEY")
+            if google_key_base64:
+                try:
+                    google_creds_json = base64.b64decode(google_key_base64).decode('utf-8')
+                    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+                        temp_file.write(google_creds_json)
+                        credentials_path = temp_file.name
+                    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+                    logger.info("✅ Google Cloud credentials configured for email summaries")
+                except Exception as e:
+                    logger.error(f"❌ Failed to decode GOOGLE_KEY: {str(e)}")
+            _google_creds_loaded_summary = True
+
+        # Get project ID
+        google_key = os.getenv("GOOGLE_KEY")
+        project_id = None
+        if google_key:
+            try:
+                decoded_key = base64.b64decode(google_key)
+                key_data = json.loads(decoded_key)
+                project_id = key_data.get("project_id")
+            except Exception as e:
+                logger.error(f"❌ Error extracting project ID: {e}")
+
+        if not project_id:
+            project_id = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID")
+
+        _summary_vertex_llm = ChatVertexAI(
+            model_name="gemini-2.5-flash-lite",
+            project=project_id,
+            temperature=0.3,
+            max_tokens=2048,
+            timeout=30,
+            max_retries=1,
+        )
+        logger.info("✅ Vertex AI Gemini initialized for email summaries (BACKUP)")
+    return _summary_vertex_llm
+
+
+def generate_conversation_summary(messages: List[Dict], user_name: str = "Unknown User", user_linkedin: str = "Not provided") -> str:
+    """
+    Generate a concise summary of the conversation using AI
+    Uses Groq (primary) and Vertex AI (backup)
+
+    Args:
+        messages: List of conversation messages
+        user_name: User's name
+        user_linkedin: User's LinkedIn URL
+
+    Returns:
+        AI-generated summary of the conversation
+    """
+    try:
+        # Prepare conversation text
+        conversation_text = ""
+        for msg in messages:
+            role = "USER" if msg["role"] == "user" else "RAYANSH AI"
+            content = msg["content"]
+            conversation_text += f"{role}: {content}\n\n"
+
+        # Prompt for summary
+        system_prompt = """You are a professional conversation summarizer. Create a concise, informative summary of this portfolio chat conversation.
+
+Focus on:
+- Main topics discussed
+- User's primary interests or questions
+- Key information shared about Rayansh's experience
+- Overall tone and engagement level
+
+Keep the summary to 3-5 bullet points, professional and clear."""
+
+        user_prompt = f"""Summarize this conversation between a visitor ({user_name}) and Rayansh's AI assistant:
+
+{conversation_text}
+
+Provide a concise summary suitable for an email notification."""
+
+        # Try Groq first (PRIMARY)
+        try:
+            logger.info("🤖 Generating email summary with Groq (PRIMARY)...")
+            groq_llm = get_summary_groq_llm()
+
+            messages_to_send = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt)
+            ]
+
+            response = groq_llm.invoke(messages_to_send)
+            summary = response.content
+            logger.info("✅ Email summary generated with Groq")
+            return summary
+
+        except Exception as groq_error:
+            logger.warning(f"⚠️ Groq failed for email summary: {groq_error}")
+            logger.info("🔄 Falling back to Vertex AI for email summary...")
+
+            # Fallback to Vertex AI (BACKUP)
+            try:
+                vertex_llm = get_summary_vertex_llm()
+
+                messages_to_send = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_prompt)
+                ]
+
+                response = vertex_llm.invoke(messages_to_send)
+                summary = response.content
+                logger.info("✅ Email summary generated with Vertex AI (backup)")
+                return summary
+
+            except Exception as vertex_error:
+                logger.error(f"❌ Vertex AI also failed for email summary: {vertex_error}")
+                # Return basic summary if both fail
+                return f"Conversation with {user_name} - {len(messages)} messages exchanged."
+
+    except Exception as e:
+        logger.error(f"❌ Error generating conversation summary: {e}")
+        return f"Conversation with {user_name} - {len(messages)} messages exchanged."
 
 # In-memory session storage (use Redis for production)
 sessions: Dict[str, Dict] = {}
@@ -25,6 +187,8 @@ class ConversationTracker:
                 "message_count": 0,
                 "user_name": None,
                 "user_linkedin": None,
+                "user_email": None,
+                "user_ip": None,
                 "asked_for_name": False,
                 "asked_for_linkedin": False,
                 "started_at": datetime.now().isoformat(),
@@ -57,27 +221,22 @@ class ConversationTracker:
         return self.get_session().get("message_count", 0)
 
     def should_ask_for_name(self) -> bool:
-        """Check if we should ask for user's name (after 1st question)"""
+        """Check if we should ask for user's name and contact (after 1st question)"""
         session = self.get_session()
         return (
-            session.get("message_count") == 2 and  # After first Q&A
+            session.get("message_count") == 1 and  # After first user message (before AI response added)
             not session.get("asked_for_name") and
             not session.get("user_name")
         )
 
     def should_ask_for_linkedin(self) -> bool:
-        """Check if we should ask for LinkedIn (after 3rd question)"""
-        session = self.get_session()
-        return (
-            session.get("message_count") == 6 and  # After third Q&A
-            not session.get("asked_for_linkedin") and
-            not session.get("user_linkedin")
-        )
+        """No longer needed - we ask for both name and contact together"""
+        return False
 
     def extract_name_from_message(self, message: str) -> Optional[str]:
         """Try to extract name from user message"""
         # Simple patterns for name extraction
-        lower_msg = message.lower()
+        lower_msg = message.lower().strip()
 
         # Pattern: "my name is X", "i'm X", "i am X", "this is X", "call me X"
         patterns = [
@@ -101,6 +260,15 @@ class ConversationTracker:
                 if name_words:
                     return ' '.join(name_words).strip('.,!?')
 
+        # If message is just a single word/name after we asked for it
+        session = self.get_session()
+        if session.get("asked_for_name") and not session.get("user_name"):
+            # Check if message is short (likely just a name)
+            words = message.strip().split()
+            if 1 <= len(words) <= 3 and not any(char in message for char in ['@', 'http', '?', '!']):
+                # Likely just a name
+                return message.strip().title()
+
         return None
 
     def extract_linkedin_from_message(self, message: str) -> Optional[str]:
@@ -118,18 +286,23 @@ class ConversationTracker:
                     return url
         return None
 
+    def extract_email_from_message(self, message: str) -> Optional[str]:
+        """Try to extract email from user message"""
+        import re
+        # Simple email regex
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        match = re.search(email_pattern, message)
+        if match:
+            return match.group(0)
+        return None
+
     def get_intro_prompt(self) -> str:
-        """Get introduction prompt to ask for name"""
-        return "\n\nBy the way, I'd love to know who I'm talking to! What's your name?"
+        """Get introduction prompt to ask for name and contact info"""
+        return "\n\nBy the way, I'd love to know who I'm talking to! What's your name, and could you share your LinkedIn profile or email?"
 
     def get_linkedin_prompt(self) -> str:
-        """Get LinkedIn prompt"""
-        session = self.get_session()
-        name = session.get("user_name", "")
-        if name:
-            return f"\n\nThanks for the great questions, {name}! I'd love to connect with you. Could you share your LinkedIn profile?"
-        else:
-            return "\n\nI'd love to connect with you! Could you share your LinkedIn profile?"
+        """No longer used - we ask for everything together"""
+        return ""
 
     def mark_asked_for_name(self):
         """Mark that we've asked for name"""
@@ -148,6 +321,16 @@ class ConversationTracker:
         """Set user's LinkedIn"""
         self.update_session(user_linkedin=linkedin)
         logger.info(f"✅ User LinkedIn set: {linkedin}")
+
+    def set_user_email(self, email: str):
+        """Set user's email"""
+        self.update_session(user_email=email)
+        logger.info(f"✅ User email set: {email}")
+
+    def set_user_ip(self, ip: str):
+        """Set user's IP address"""
+        self.update_session(user_ip=ip)
+        logger.info(f"📍 User IP set: {ip}")
 
     def get_conversation_summary(self) -> str:
         """Generate conversation summary for email"""
@@ -215,8 +398,18 @@ def send_conversation_email(session_id: str):
         # Prepare email content
         user_name = session.get("user_name", "Unknown User")
         user_linkedin = session.get("user_linkedin", "Not provided")
+        user_email = session.get("user_email", "Not provided")
+        user_ip = session.get("user_ip", "Unknown")
         message_count = session.get("message_count", 0)
         started_at = session.get("started_at", "Unknown")
+
+        # Generate AI summary (using Groq primary, Vertex AI backup)
+        logger.info("📝 Generating AI summary for email...")
+        ai_summary = generate_conversation_summary(
+            messages=session.get("messages", []),
+            user_name=user_name,
+            user_linkedin=user_linkedin
+        )
 
         # Email subject
         subject = f"💬 New Portfolio Chat: {user_name}"
@@ -230,9 +423,15 @@ USER INFORMATION
 ----------------
 Name: {user_name}
 LinkedIn: {user_linkedin}
+Email: {user_email}
+IP Address: {user_ip}
 Session ID: {session_id}
 Total Messages: {message_count}
 Started: {started_at}
+
+AI SUMMARY (Generated by Groq)
+-------------------------------
+{ai_summary}
 
 CONVERSATION TRANSCRIPT
 -----------------------
@@ -278,6 +477,16 @@ CONVERSATION TRANSCRIPT
                         </td>
                     </tr>
                     <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Email:</td>
+                        <td style="padding: 8px 0;">
+                            {f'<a href="mailto:{user_email}" style="color: #3b82f6; text-decoration: none;">{user_email}</a>' if user_email != "Not provided" else '<span style="color: #94a3b8;">Not provided</span>'}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-weight: 500;">IP Address:</td>
+                        <td style="padding: 8px 0; color: #64748b; font-family: monospace; font-size: 13px;">{user_ip}</td>
+                    </tr>
+                    <tr>
                         <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Messages:</td>
                         <td style="padding: 8px 0; color: #1e293b;">{message_count}</td>
                     </tr>
@@ -290,6 +499,13 @@ CONVERSATION TRANSCRIPT
                         <td style="padding: 8px 0; color: #64748b; font-size: 13px;">{started_at}</td>
                     </tr>
                 </table>
+            </div>
+
+            <!-- AI Summary -->
+            <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 30px;">
+                <h2 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px; font-weight: 600;">🤖 AI Summary</h2>
+                <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.8; white-space: pre-wrap;">{ai_summary}</p>
+                <p style="margin: 10px 0 0 0; color: #d97706; font-size: 12px; font-style: italic;">Generated by Groq (Llama 3.3)</p>
             </div>
 
             <!-- Conversation Transcript -->
@@ -322,8 +538,7 @@ CONVERSATION TRANSCRIPT
         <!-- Footer -->
         <div style="background: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
             <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                🤖 Automated summary from Rayansh's AI Portfolio Assistant<br>
-                Powered by Vertex AI & Groq | Built with LangChain & Pinecone
+                🤖 Automated summary from Rayansh's AI Portfolio Assistant
             </p>
         </div>
 
@@ -336,14 +551,14 @@ CONVERSATION TRANSCRIPT
         api_endpoint = f"https://api.mailgun.net/v3/{mailgun_domain}/messages"
 
         # Send via Mailgun API (using requests library as per documentation)
-        logger.info(f"📧 Sending email via Mailgun to rayanshsrivastava.ai@gmail.com...")
+        logger.info(f"📧 Sending email via Mailgun to rayanshsrivastava1@gmail.com...")
 
         response = requests.post(
             api_endpoint,
             auth=("api", mailgun_api_key),  # Authentication as per Mailgun docs
             data={
                 "from": f"Rayansh AI Assistant <noreply@{mailgun_domain}>",
-                "to": ["rayanshsrivastava.ai@gmail.com"],
+                "to": ["rayanshsrivastava1@gmail.com"],
                 "subject": subject,
                 "text": text_body,
                 "html": html_body,
@@ -358,7 +573,7 @@ CONVERSATION TRANSCRIPT
             response_data = response.json()
             message_id = response_data.get("id", "unknown")
             logger.info(f"✅ Email sent successfully! Message ID: {message_id}")
-            logger.info(f"📬 Recipient: rayanshsrivastava.ai@gmail.com | Session: {session_id}")
+            logger.info(f"📬 Recipient: rayanshsrivastava1@gmail.com | Session: {session_id}")
         else:
             logger.error(f"❌ Mailgun API error: {response.status_code}")
             logger.error(f"Response: {response.text}")
