@@ -7,3 +7,9 @@ backend/blocked_ips.json
 backend/rate_limits.json
 backend/session_limits.json
 backend/daily_quota.json
+
+terraform\terraform.tfvars.example
+terraform\variables.tf
+demo.pem
+
+saturnintech-f3a9d60147b2.json

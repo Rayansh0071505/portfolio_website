@@ -16,12 +16,14 @@ from langchain_google_vertexai import ChatVertexAI
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.agents import create_agent
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langchain_pinecone import PineconeVectorStore
+import redis.asyncio as redis_async
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
 import os
 from dotenv import load_dotenv
+from config import get_redis_secret, get_groq_api_key, get_google_key, get_pinecone_api_key
 
 load_dotenv()
 
@@ -47,9 +49,9 @@ def get_vector_store():
     global _embeddings, _vector_store
 
     if _vector_store is None:
-        pinecone_api_key = os.getenv("PINECONE_API_KEY")
+        pinecone_api_key = get_pinecone_api_key()
         if not pinecone_api_key:
-            raise ValueError("PINECONE_API_KEY environment variable not set")
+            raise ValueError("PINECONE_API_KEY not found in config or environment")
 
         pc = Pinecone(api_key=pinecone_api_key)
         index = pc.Index("myself")  # Using the knowledge base index
@@ -67,13 +69,13 @@ def get_vector_store():
 
 
 def get_gcp_project_id():
-    """Extract project ID from GOOGLE_KEY environment variable."""
+    """Extract project ID from GOOGLE_KEY config."""
     global GCP_PROJECT_ID
 
     if GCP_PROJECT_ID:
         return GCP_PROJECT_ID
 
-    google_key = os.getenv("GOOGLE_KEY")
+    google_key = get_google_key()
     if google_key:
         try:
             decoded_key = base64.b64decode(google_key)
@@ -94,8 +96,8 @@ def get_gcp_project_id():
 
 
 def get_google_credentials():
-    """Load Google credentials from env var (base64 encoded)"""
-    google_key_base64 = os.getenv("GOOGLE_KEY")
+    """Load Google credentials from config (base64 encoded)"""
+    google_key_base64 = get_google_key()
 
     if google_key_base64:
         try:
@@ -146,9 +148,9 @@ def get_backup_llm():
     """Get Groq LLM as backup for chat (fallback if Vertex AI fails)"""
     global _backup_llm
     if _backup_llm is None:
-        groq_api_key = os.getenv("GROQ_API_KEY")
+        groq_api_key = get_groq_api_key()
         if not groq_api_key:
-            raise ValueError("GROQ_API_KEY environment variable not set")
+            raise ValueError("GROQ_API_KEY not found in config or environment")
 
         _backup_llm = ChatGroq(
             model="llama-3.3-70b-versatile",
@@ -358,8 +360,8 @@ REMEMBER: You are Rayansh. Speak confidently about what's in the knowledge base,
 # AGENT SETUP (LangGraph)
 # ============================================================================
 
-def create_rayansh_agent(use_backup: bool = False):
-    """Create the LangGraph agent with tools and memory (modern pattern)"""
+async def create_rayansh_agent(use_backup: bool = False):
+    """Create the LangGraph agent with tools and Redis memory (modern pattern)"""
 
     # Select LLM
     try:
@@ -373,14 +375,29 @@ def create_rayansh_agent(use_backup: bool = False):
         logger.error(f"❌ Error initializing LLM: {str(e)}")
         if not use_backup:
             logger.info("🔄 Falling back to Groq...")
-            return create_rayansh_agent(use_backup=True)
+            return await create_rayansh_agent(use_backup=True)
         raise
 
     # Define tools
     tools = [search_rayansh_knowledge]
 
-    # Create memory checkpointer
-    checkpointer = MemorySaver()
+    # Create Redis checkpointer for persistent memory
+    redis_url = get_redis_secret()
+    if not redis_url:
+        raise ValueError("REDIS_SECRET not found in config or environment")
+
+    # Create async Redis checkpointer with TTL (auto-expire after 24 hours)
+    checkpointer = AsyncRedisSaver.from_conn_string(
+        redis_url,
+        ttl={
+            "default_ttl": 1440,  # 24 hours in minutes
+            "refresh_on_read": True  # Reset expiration when conversation accessed
+        }
+    )
+
+    # Setup Redis indices (required on first use)
+    await checkpointer.asetup()
+    logger.info("✅ Redis checkpointer initialized with 24h TTL")
 
     # Create agent using modern create_agent pattern
     agent = create_agent(
@@ -391,7 +408,7 @@ def create_rayansh_agent(use_backup: bool = False):
     )
 
     logger.info("✅ LangGraph agent created successfully")
-    return agent
+    return agent, checkpointer
 
 
 # ============================================================================
@@ -399,23 +416,24 @@ def create_rayansh_agent(use_backup: bool = False):
 # ============================================================================
 
 class RayanshAI:
-    """Async-safe AI assistant for Rayansh - supports concurrent users"""
+    """Async-safe AI assistant for Rayansh - supports concurrent users with Redis persistence"""
 
     def __init__(self):
         self.agent = None
+        self.checkpointer = None
         self.use_backup = False
 
     async def initialize(self):
-        """Initialize agent (call once at startup)"""
+        """Initialize agent with Redis checkpointer (call once at startup)"""
         try:
-            self.agent = create_rayansh_agent(use_backup=self.use_backup)
-            logger.info("✅ Rayansh AI Agent initialized")
+            self.agent, self.checkpointer = await create_rayansh_agent(use_backup=self.use_backup)
+            logger.info("✅ Rayansh AI Agent initialized with Redis persistence")
         except Exception as e:
             logger.error(f"❌ Failed to initialize agent: {str(e)}")
             if not self.use_backup:
                 logger.info("🔄 Retrying with backup LLM (Groq)...")
                 self.use_backup = True
-                self.agent = create_rayansh_agent(use_backup=True)
+                self.agent, self.checkpointer = await create_rayansh_agent(use_backup=True)
 
     async def chat(
         self,
@@ -521,13 +539,31 @@ class RayanshAI:
                 "timestamp": datetime.now().isoformat()
             }
 
-    def clear_session(self, session_id: str):
+    async def clear_session(self, session_id: str):
         """
-        Clear chat history for a session
-        Note: With LangGraph's MemorySaver, memory is automatically managed per thread_id
-        This method is kept for API compatibility but memory clears automatically
+        Clear chat history for a session from Redis
+        Deletes all conversation context and checkpoints for the given session
         """
-        logger.info(f"🗑️ Session cleared (handled by LangGraph): {session_id}")
+        try:
+            if self.checkpointer:
+                # Get Redis client from checkpointer
+                redis_client = self.checkpointer.conn
+
+                # Delete all keys associated with this thread_id (session_id)
+                # LangGraph stores checkpoints with pattern: checkpoint:thread_id:*
+                pattern = f"*{session_id}*"
+                cursor = 0
+                deleted_count = 0
+
+                async for key in redis_client.scan_iter(match=pattern):
+                    await redis_client.delete(key)
+                    deleted_count += 1
+
+                logger.info(f"🗑️ Session cleared from Redis: {session_id} ({deleted_count} keys deleted)")
+            else:
+                logger.warning(f"⚠️ Checkpointer not initialized, cannot clear session: {session_id}")
+        except Exception as e:
+            logger.error(f"❌ Error clearing session {session_id}: {str(e)}")
 
 
 # ============================================================================

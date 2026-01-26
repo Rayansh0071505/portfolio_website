@@ -2,6 +2,8 @@
 fastapi
 uvicorn
 python-dotenv
+redis
+boto3  # AWS SDK for Parameter Store
 
 # LangChain & LangGraph
 langchain
@@ -11,6 +13,7 @@ langchain-pinecone
 langchain-groq
 langchain-google-vertexai
 langgraph
+langgraph-checkpoint-redis
 
 # Vector Database
 pinecone-client

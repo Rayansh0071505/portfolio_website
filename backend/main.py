@@ -1,13 +1,15 @@
 """
 FastAPI Backend for Rayansh's Personal AI Assistant
 with Conversation Tracking and Email Summaries
-SECURITY: Rate limiting, IP blocking, request validation, quota tracking
+SECURITY: Rate limiting, IP blocking, request validation, quota tracking, CloudFront verification
 """
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 import uuid
+import os
 from datetime import datetime
 import logging
 
@@ -24,9 +26,19 @@ from security_middleware import (
     get_client_ip
 )
 
+# Import configuration (AWS Parameter Store)
+from config import get_cloudfront_secret
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Environment detection
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+IS_PRODUCTION = ENVIRONMENT == "production"
+
+# CloudFront secret for origin verification
+CLOUDFRONT_SECRET = get_cloudfront_secret() if IS_PRODUCTION else None
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -35,24 +47,109 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware - SECURITY: Only allow requests from your frontend
-# TODO: Replace with your actual production domain when deployed
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",  # Alternative React dev server
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    # Add your production domain here, e.g.:
-    # "https://your-portfolio-domain.com",
-]
+# CORS middleware - SECURITY: Only allow requests from CloudFront/S3 frontend
+# Get CloudFront domain from environment variable
+CLOUDFRONT_DOMAIN = os.getenv("CLOUDFRONT_DOMAIN", "")
+CUSTOM_DOMAIN = os.getenv("CUSTOM_DOMAIN", "")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Restricted to frontend only
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],  # Only allow needed methods
-    allow_headers=["Content-Type"],  # Only allow needed headers
-)
+# Build allowed origins list
+ALLOWED_ORIGINS = []
+
+# Development origins
+if not IS_PRODUCTION:
+    ALLOWED_ORIGINS.extend([
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternative React dev server
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ])
+
+# Production origins (CloudFront only)
+if IS_PRODUCTION:
+    # Add custom domain if configured
+    if CUSTOM_DOMAIN:
+        ALLOWED_ORIGINS.append(f"https://{CUSTOM_DOMAIN}")
+        logger.info(f"✅ Allowed custom domain: https://{CUSTOM_DOMAIN}")
+
+    # For CloudFront, we'll handle dynamically in middleware
+    logger.info("✅ CORS: CloudFront domains handled dynamically")
+else:
+    # Development: standard CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
+
+# ============================================================================
+# CLOUDFRONT ORIGIN VERIFICATION MIDDLEWARE
+# ============================================================================
+
+@app.middleware("http")
+async def verify_cloudfront_origin(request: Request, call_next):
+    """
+    Verify requests come from CloudFront only (production)
+    Blocks direct access to EC2 IP/domain
+    Also handles CORS for CloudFront domains dynamically
+    """
+    # Skip verification in development
+    if not IS_PRODUCTION:
+        return await call_next(request)
+
+    # Skip for health check endpoint
+    if request.url.path == "/":
+        return await call_next(request)
+
+    # Check CloudFront custom header
+    cf_secret = request.headers.get("X-CloudFront-Secret", "")
+
+    if CLOUDFRONT_SECRET and cf_secret != CLOUDFRONT_SECRET:
+        logger.warning(f"🚫 Blocked direct access from IP: {get_client_ip(request)}")
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "Access denied - requests must come through CloudFront",
+                "error": "DIRECT_ACCESS_BLOCKED"
+            }
+        )
+
+    # Get origin and validate
+    origin = request.headers.get("origin", "")
+    allowed = False
+
+    # Check if CloudFront domain
+    if origin.endswith(".cloudfront.net") or "cloudfront.net" in origin:
+        allowed = True
+        logger.info(f"✅ Allowed CloudFront origin: {origin}")
+
+    # Check if custom domain
+    if CUSTOM_DOMAIN and origin == f"https://{CUSTOM_DOMAIN}":
+        allowed = True
+
+    # Block if not allowed
+    if origin and not allowed:
+        logger.warning(f"🚫 Blocked unauthorized origin: {origin}")
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "Access denied - unauthorized origin",
+                "error": "INVALID_ORIGIN"
+            }
+        )
+
+    # Process request
+    response = await call_next(request)
+
+    # Add CORS headers manually for CloudFront
+    if origin and allowed:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CloudFront-Secret"
+
+    return response
 
 # ============================================================================
 # REQUEST/RESPONSE MODELS
@@ -128,8 +225,8 @@ async def chat(chat_request: ChatRequest, request: Request, background_tasks: Ba
         client_ip = get_client_ip(request)
         logger.info(f"📥 Request from IP: {client_ip}")
 
-        # ========== SECURITY LAYER 2: RATE LIMITING ==========
-        is_allowed, rate_error = rate_limiter.check_rate_limit(client_ip)
+        # ========== SECURITY LAYER 2: RATE LIMITING (REDIS) ==========
+        is_allowed, rate_error = await rate_limiter.check_rate_limit(client_ip)
         if not is_allowed:
             logger.warning(f"🚫 Rate limit blocked: {client_ip} - {rate_error}")
             raise HTTPException(status_code=429, detail=rate_error)
@@ -144,14 +241,14 @@ async def chat(chat_request: ChatRequest, request: Request, background_tasks: Ba
         if not chat_request.session_id:
             chat_request.session_id = f"session_{uuid.uuid4().hex[:16]}"
 
-        # ========== SECURITY LAYER 4: SESSION MESSAGE LIMIT ==========
-        is_allowed_session, session_error = session_limiter.check_session_limit(chat_request.session_id)
+        # ========== SECURITY LAYER 4: SESSION MESSAGE LIMIT (REDIS) ==========
+        is_allowed_session, session_error = await session_limiter.check_session_limit(chat_request.session_id)
         if not is_allowed_session:
             logger.warning(f"⚠️ Session limit reached: {chat_request.session_id}")
             raise HTTPException(status_code=429, detail=session_error)
 
-        # ========== SECURITY LAYER 5: DAILY QUOTA CHECK ==========
-        quota_ok, quota_error = quota_tracker.check_quota()
+        # ========== SECURITY LAYER 5: DAILY QUOTA CHECK (REDIS) ==========
+        quota_ok, quota_error = await quota_tracker.check_quota()
         if not quota_ok:
             logger.error(f"🚨 Daily quota exceeded - using backup model")
             # Don't block request, just log - backup model (Groq) will be used
@@ -161,43 +258,46 @@ async def chat(chat_request: ChatRequest, request: Request, background_tasks: Ba
 
         # Initialize conversation tracker
         tracker = ConversationTracker(chat_request.session_id)
+        await tracker.initialize()
 
         # Store user IP (first time only)
-        if not tracker.get_session().get("user_ip"):
-            tracker.set_user_ip(client_ip)
+        session = await tracker.get_session()
+        if not session.get("user_ip"):
+            await tracker.set_user_ip(client_ip)
 
         # Extract name, LinkedIn, or email from message if present
         extracted_name = tracker.extract_name_from_message(chat_request.message)
-        if extracted_name and not tracker.get_session().get("user_name"):
-            tracker.set_user_name(extracted_name)
+        if extracted_name and not session.get("user_name"):
+            await tracker.set_user_name(extracted_name)
 
         extracted_linkedin = tracker.extract_linkedin_from_message(chat_request.message)
-        if extracted_linkedin and not tracker.get_session().get("user_linkedin"):
-            tracker.set_user_linkedin(extracted_linkedin)
+        if extracted_linkedin and not session.get("user_linkedin"):
+            await tracker.set_user_linkedin(extracted_linkedin)
 
         extracted_email = tracker.extract_email_from_message(chat_request.message)
-        if extracted_email and not tracker.get_session().get("user_email"):
-            tracker.set_user_email(extracted_email)
+        if extracted_email and not session.get("user_email"):
+            await tracker.set_user_email(extracted_email)
 
         # Add user message to tracker
-        tracker.add_message("user", chat_request.message)
+        await tracker.add_message("user", chat_request.message)
 
         # Get AI response
+        session = await tracker.get_session()
         response = await rayansh_ai.chat(
             message=chat_request.message,
             session_id=chat_request.session_id,
-            user_name=chat_request.user_name or tracker.get_session().get("user_name")
+            user_name=chat_request.user_name or session.get("user_name")
         )
 
-        # ========== INCREMENT SECURITY COUNTERS ==========
-        session_limiter.increment_session(chat_request.session_id)
-        quota_tracker.increment_quota()
+        # ========== INCREMENT SECURITY COUNTERS (REDIS) ==========
+        await session_limiter.increment_session(chat_request.session_id)
+        await quota_tracker.increment_quota()
 
         ai_message = response["message"]
         follow_up_message = None
 
         # Check if user just provided contact info (after we asked)
-        session = tracker.get_session()
+        session = await tracker.get_session()
         if session.get("asked_for_name") and (extracted_name or extracted_email or extracted_linkedin):
             # User just provided their info - acknowledge it warmly
             parts = []
@@ -220,17 +320,17 @@ async def chat(chat_request: ChatRequest, request: Request, background_tasks: Ba
                     ai_message = acknowledgment + ai_message
 
         # Check if we should ask for name and contact (after 1st question)
-        elif tracker.should_ask_for_name():
+        elif await tracker.should_ask_for_name():
             follow_up_message = tracker.get_intro_prompt()
-            tracker.mark_asked_for_name()
+            await tracker.mark_asked_for_name()
             logger.info(f"🙋 Asking for name and contact in session {chat_request.session_id}")
 
         # Add AI response to tracker
-        tracker.add_message("assistant", ai_message)
+        await tracker.add_message("assistant", ai_message)
 
         # Add follow-up to tracker if exists
         if follow_up_message:
-            tracker.add_message("assistant", follow_up_message)
+            await tracker.add_message("assistant", follow_up_message)
 
         # Schedule cleanup of old sessions in background
         background_tasks.add_task(cleanup_old_sessions, max_age_hours=24)
@@ -286,11 +386,17 @@ async def clear_session(session_id: str, background_tasks: BackgroundTasks):
         # Send email before clearing
         background_tasks.add_task(send_conversation_email, session_id)
 
-        # Clear the session
-        rayansh_ai.clear_session(session_id)
+        # Clear the session from Redis (both AI context and conversation data)
+        await rayansh_ai.clear_session(session_id)
 
-        # Clear session limiter counter
-        session_limiter.clear_session(session_id)
+        # Also clear conversation tracker session
+        tracker = ConversationTracker(session_id)
+        await tracker.delete_session()
+
+        # Clear session limiter counter (Redis)
+        await session_limiter.clear_session(session_id)
+
+        logger.info(f"✅ Session cleared from Redis: {session_id}")
 
         return {
             "status": "success",
@@ -303,10 +409,11 @@ async def clear_session(session_id: str, background_tasks: BackgroundTasks):
 
 @app.get("/api/session/{session_id}")
 async def get_session_info(session_id: str):
-    """Get session information"""
+    """Get session information from Redis"""
     try:
         tracker = ConversationTracker(session_id)
-        session = tracker.get_session()
+        await tracker.initialize()
+        session = await tracker.get_session()
 
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -341,38 +448,43 @@ async def get_status():
 @app.get("/api/security/stats")
 async def get_security_stats():
     """
-    Get security statistics (for monitoring)
+    Get security statistics from Redis (for monitoring)
     Shows rate limit status and blocked IPs
     """
+    blocked_ips = await rate_limiter.get_blocked_ips()
+    quota_data = await quota_tracker.get_quota_data()
+
     return {
-        "blocked_ips": rate_limiter.blocked_ips,
+        "blocked_ips": blocked_ips,
         "daily_quota": {
-            "used": quota_tracker.quota_data.get("count", 0),
+            "used": quota_data.get("count", 0),
             "limit": quota_tracker.DAILY_REQUEST_LIMIT,
-            "date": quota_tracker.quota_data.get("date")
+            "date": quota_data.get("date")
         },
         "limits": {
             "per_minute": 10,
             "per_hour": 50,
-            "per_day": 30,
+            "per_day": 60,
             "messages_per_session": session_limiter.MAX_MESSAGES_PER_SESSION
         },
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "storage": "Redis (distributed, persistent)"
     }
 
 @app.post("/api/security/unblock/{ip_address}")
 async def unblock_ip(ip_address: str):
     """
-    Manually unblock an IP address
+    Manually unblock an IP address from Redis
     NOTE: You should add authentication to this endpoint in production
     """
-    if ip_address in rate_limiter.blocked_ips:
-        del rate_limiter.blocked_ips[ip_address]
-        rate_limiter._save_blocked_ips()
-        logger.info(f"✅ Unblocked IP: {ip_address}")
+    is_blocked, _ = await rate_limiter.is_blocked(ip_address)
+
+    if is_blocked:
+        await rate_limiter.unblock_ip(ip_address)
+        logger.info(f"✅ Unblocked IP from Redis: {ip_address}")
         return {
             "status": "success",
-            "message": f"IP {ip_address} has been unblocked",
+            "message": f"IP {ip_address} has been unblocked from Redis",
             "timestamp": datetime.now().isoformat()
         }
     else:
@@ -386,7 +498,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8080,
         reload=True,
         log_level="info"

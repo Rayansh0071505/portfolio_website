@@ -2,7 +2,11 @@
  * API utilities for Rayansh's Personal AI Chat
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080';
+// In production, use relative URLs (CloudFront routes /api/* to backend)
+// In development, use localhost backend
+const API_BASE_URL = import.meta.env.PROD
+  ? ''  // Production: relative URL (same domain via CloudFront)
+  : (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080');  // Dev: localhost
 
 export interface ChatMessage {
   role: 'user' | 'assistant';

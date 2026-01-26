@@ -1,6 +1,7 @@
 """
 Conversation Tracker - Tracks user interactions and sends email summaries
 Uses Groq (primary) and Vertex AI (backup) for generating email summaries
+Now with Redis for persistent session storage
 """
 import os
 import logging
@@ -10,11 +11,30 @@ import requests
 import base64
 import json
 import tempfile
+import redis.asyncio as redis_async
 from langchain_groq import ChatGroq
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from config import get_redis_secret, get_groq_api_key, get_google_key, get_mailgun_domain, get_mailgun_secret
 
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# REDIS CONNECTION FOR SESSION STORAGE
+# ============================================================================
+
+_redis_client = None
+
+async def get_redis_client():
+    """Get Redis client for session storage"""
+    global _redis_client
+    if _redis_client is None:
+        redis_url = get_redis_secret()
+        if not redis_url:
+            raise ValueError("REDIS_SECRET not found in config or environment")
+        _redis_client = redis_async.from_url(redis_url, decode_responses=True)
+        logger.info("✅ Redis client initialized for session storage")
+    return _redis_client
 
 # ============================================================================
 # AI MODELS FOR EMAIL SUMMARY GENERATION
@@ -29,9 +49,9 @@ def get_summary_groq_llm():
     """Get Groq LLM for email summaries (PRIMARY - Free)"""
     global _summary_groq_llm
     if _summary_groq_llm is None:
-        groq_api_key = os.getenv("GROQ_API_KEY")
+        groq_api_key = get_groq_api_key()
         if not groq_api_key:
-            raise ValueError("GROQ_API_KEY environment variable not set")
+            raise ValueError("GROQ_API_KEY not found in config or environment")
 
         _summary_groq_llm = ChatGroq(
             model="llama-3.3-70b-versatile",
@@ -52,7 +72,7 @@ def get_summary_vertex_llm():
     if _summary_vertex_llm is None:
         # Load Google credentials if not already loaded
         if not _google_creds_loaded_summary:
-            google_key_base64 = os.getenv("GOOGLE_KEY")
+            google_key_base64 = get_google_key()
             if google_key_base64:
                 try:
                     google_creds_json = base64.b64decode(google_key_base64).decode('utf-8')
@@ -66,7 +86,7 @@ def get_summary_vertex_llm():
             _google_creds_loaded_summary = True
 
         # Get project ID
-        google_key = os.getenv("GOOGLE_KEY")
+        google_key = get_google_key()
         project_id = None
         if google_key:
             try:
@@ -171,65 +191,133 @@ Provide a concise summary suitable for an email notification."""
         logger.error(f"❌ Error generating conversation summary: {e}")
         return f"Conversation with {user_name} - {len(messages)} messages exchanged."
 
-# In-memory session storage (use Redis for production)
-sessions: Dict[str, Dict] = {}
-
 class ConversationTracker:
-    """Track conversation state and collect user info"""
+    """Track conversation state and collect user info using Redis"""
 
     def __init__(self, session_id: str):
         self.session_id = session_id
+        self.redis_key = f"session:{session_id}"
+        self._redis_client = None
 
-        # Initialize session if not exists
-        if session_id not in sessions:
-            sessions[session_id] = {
-                "messages": [],
+    async def _get_redis(self):
+        """Get Redis client (lazy initialization)"""
+        if self._redis_client is None:
+            self._redis_client = await get_redis_client()
+        return self._redis_client
+
+    async def initialize(self):
+        """Initialize session in Redis if not exists"""
+        redis_client = await self._get_redis()
+
+        # Check if session exists
+        exists = await redis_client.exists(self.redis_key)
+
+        if not exists:
+            # Create new session with 24 hour expiration
+            session_data = {
+                "messages": json.dumps([]),
                 "message_count": 0,
-                "user_name": None,
-                "user_linkedin": None,
-                "user_email": None,
-                "user_ip": None,
-                "asked_for_name": False,
-                "asked_for_linkedin": False,
+                "user_name": "",
+                "user_linkedin": "",
+                "user_email": "",
+                "user_ip": "",
+                "asked_for_name": "false",
+                "asked_for_linkedin": "false",
                 "started_at": datetime.now().isoformat(),
                 "last_activity": datetime.now().isoformat()
             }
+            await redis_client.hset(self.redis_key, mapping=session_data)
+            # Set expiration to 24 hours
+            await redis_client.expire(self.redis_key, 86400)
+            logger.info(f"📝 New session created in Redis: {self.session_id}")
 
-    def get_session(self) -> Dict:
-        """Get session data"""
-        return sessions.get(self.session_id, {})
+    async def get_session(self) -> Dict:
+        """Get session data from Redis"""
+        try:
+            redis_client = await self._get_redis()
+            data = await redis_client.hgetall(self.redis_key)
 
-    def update_session(self, **kwargs):
-        """Update session data"""
-        if self.session_id in sessions:
-            sessions[self.session_id].update(kwargs)
-            sessions[self.session_id]["last_activity"] = datetime.now().isoformat()
+            if not data:
+                return {}
 
-    def add_message(self, role: str, content: str):
-        """Add message to conversation history"""
-        session = self.get_session()
-        session["messages"].append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat()
-        })
-        session["message_count"] += 1
-        session["last_activity"] = datetime.now().isoformat()
+            # Convert Redis hash to dict with proper types
+            return {
+                "messages": json.loads(data.get("messages", "[]")),
+                "message_count": int(data.get("message_count", 0)),
+                "user_name": data.get("user_name") or None,
+                "user_linkedin": data.get("user_linkedin") or None,
+                "user_email": data.get("user_email") or None,
+                "user_ip": data.get("user_ip") or None,
+                "asked_for_name": data.get("asked_for_name") == "true",
+                "asked_for_linkedin": data.get("asked_for_linkedin") == "true",
+                "started_at": data.get("started_at"),
+                "last_activity": data.get("last_activity")
+            }
+        except Exception as e:
+            logger.error(f"❌ Error getting session from Redis: {str(e)}")
+            return {}
 
-    def get_message_count(self) -> int:
-        """Get current message count"""
-        return self.get_session().get("message_count", 0)
+    async def update_session(self, **kwargs):
+        """Update session data in Redis"""
+        try:
+            redis_client = await self._get_redis()
 
-    def should_ask_for_name(self) -> bool:
+            # Prepare updates
+            updates = {}
+            for key, value in kwargs.items():
+                if isinstance(value, bool):
+                    updates[key] = "true" if value else "false"
+                elif isinstance(value, (list, dict)):
+                    updates[key] = json.dumps(value)
+                else:
+                    updates[key] = str(value) if value is not None else ""
+
+            # Always update last_activity
+            updates["last_activity"] = datetime.now().isoformat()
+
+            # Update Redis hash
+            await redis_client.hset(self.redis_key, mapping=updates)
+
+            # Refresh expiration to 24 hours
+            await redis_client.expire(self.redis_key, 86400)
+
+        except Exception as e:
+            logger.error(f"❌ Error updating session in Redis: {str(e)}")
+
+    async def add_message(self, role: str, content: str):
+        """Add message to conversation history in Redis"""
+        try:
+            session = await self.get_session()
+            messages = session.get("messages", [])
+            messages.append({
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Update Redis with new message and incremented count
+            await self.update_session(
+                messages=messages,
+                message_count=session.get("message_count", 0) + 1
+            )
+        except Exception as e:
+            logger.error(f"❌ Error adding message to Redis: {str(e)}")
+
+    async def get_message_count(self) -> int:
+        """Get current message count from Redis"""
+        session = await self.get_session()
+        return session.get("message_count", 0)
+
+    async def should_ask_for_name(self) -> bool:
         """Check if we should ask for user's name and contact (after 1st question)"""
-        session = self.get_session()
+        session = await self.get_session()
         return (
             session.get("message_count") == 1 and  # After first user message (before AI response added)
             not session.get("asked_for_name") and
             not session.get("user_name")
         )
 
-    def should_ask_for_linkedin(self) -> bool:
+    async def should_ask_for_linkedin(self) -> bool:
         """No longer needed - we ask for both name and contact together"""
         return False
 
@@ -304,37 +392,37 @@ class ConversationTracker:
         """No longer used - we ask for everything together"""
         return ""
 
-    def mark_asked_for_name(self):
+    async def mark_asked_for_name(self):
         """Mark that we've asked for name"""
-        self.update_session(asked_for_name=True)
+        await self.update_session(asked_for_name=True)
 
-    def mark_asked_for_linkedin(self):
+    async def mark_asked_for_linkedin(self):
         """Mark that we've asked for LinkedIn"""
-        self.update_session(asked_for_linkedin=True)
+        await self.update_session(asked_for_linkedin=True)
 
-    def set_user_name(self, name: str):
+    async def set_user_name(self, name: str):
         """Set user's name"""
-        self.update_session(user_name=name)
+        await self.update_session(user_name=name)
         logger.info(f"✅ User name set: {name}")
 
-    def set_user_linkedin(self, linkedin: str):
+    async def set_user_linkedin(self, linkedin: str):
         """Set user's LinkedIn"""
-        self.update_session(user_linkedin=linkedin)
+        await self.update_session(user_linkedin=linkedin)
         logger.info(f"✅ User LinkedIn set: {linkedin}")
 
-    def set_user_email(self, email: str):
+    async def set_user_email(self, email: str):
         """Set user's email"""
-        self.update_session(user_email=email)
+        await self.update_session(user_email=email)
         logger.info(f"✅ User email set: {email}")
 
-    def set_user_ip(self, ip: str):
+    async def set_user_ip(self, ip: str):
         """Set user's IP address"""
-        self.update_session(user_ip=ip)
+        await self.update_session(user_ip=ip)
         logger.info(f"📍 User IP set: {ip}")
 
-    def get_conversation_summary(self) -> str:
+    async def get_conversation_summary(self) -> str:
         """Generate conversation summary for email"""
-        session = self.get_session()
+        session = await self.get_session()
 
         summary = f"""
 ========================================
@@ -368,15 +456,28 @@ END OF CONVERSATION
 
         return summary
 
+    async def delete_session(self):
+        """Delete session from Redis"""
+        try:
+            redis_client = await self._get_redis()
+            deleted = await redis_client.delete(self.redis_key)
+            if deleted:
+                logger.info(f"🗑️ Session deleted from Redis: {self.session_id}")
+            else:
+                logger.warning(f"⚠️ Session not found in Redis: {self.session_id}")
+        except Exception as e:
+            logger.error(f"❌ Error deleting session from Redis: {str(e)}")
 
-def send_conversation_email(session_id: str):
+
+async def send_conversation_email(session_id: str):
     """
     Send conversation summary via Mailgun API
     Official Documentation: https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/messages
     """
     try:
         tracker = ConversationTracker(session_id)
-        session = tracker.get_session()
+        await tracker.initialize()
+        session = await tracker.get_session()
 
         # Don't send email if less than 3 messages
         if session.get("message_count", 0) < 3:
@@ -384,8 +485,8 @@ def send_conversation_email(session_id: str):
             return
 
         # Mailgun configuration - API requires domain name
-        mailgun_domain = os.getenv("MAILGUN_DOMAIN")
-        mailgun_api_key = os.getenv("MAILGUN_SECRET")
+        mailgun_domain = get_mailgun_domain()
+        mailgun_api_key = get_mailgun_secret()
 
         if not mailgun_api_key:
             logger.error("❌ MAILGUN_SECRET not set in environment variables")
@@ -584,24 +685,34 @@ CONVERSATION TRANSCRIPT
         logger.error(f"❌ Unexpected error sending email: {str(e)}")
 
 
-def cleanup_old_sessions(max_age_hours: int = 24):
-    """Clean up sessions older than max_age_hours"""
+async def cleanup_old_sessions(max_age_hours: int = 24):
+    """Clean up sessions older than max_age_hours from Redis"""
     try:
         from datetime import timedelta
 
+        redis_client = await get_redis_client()
         current_time = datetime.now()
-        to_delete = []
+        deleted_count = 0
 
-        for session_id, session in sessions.items():
-            last_activity = datetime.fromisoformat(session.get("last_activity"))
-            age = current_time - last_activity
+        # Scan all session keys
+        async for key in redis_client.scan_iter(match="session:*"):
+            try:
+                # Get last_activity from session
+                last_activity_str = await redis_client.hget(key, "last_activity")
 
-            if age > timedelta(hours=max_age_hours):
-                to_delete.append(session_id)
+                if last_activity_str:
+                    last_activity = datetime.fromisoformat(last_activity_str)
+                    age = current_time - last_activity
 
-        for session_id in to_delete:
-            del sessions[session_id]
-            logger.info(f"🗑️ Cleaned up old session: {session_id}")
+                    if age > timedelta(hours=max_age_hours):
+                        await redis_client.delete(key)
+                        deleted_count += 1
+                        logger.info(f"🗑️ Cleaned up old session: {key}")
+            except Exception as e:
+                logger.error(f"❌ Error processing session {key}: {str(e)}")
+
+        if deleted_count > 0:
+            logger.info(f"✅ Cleaned up {deleted_count} old sessions from Redis")
 
     except Exception as e:
         logger.error(f"❌ Error cleaning sessions: {str(e)}")
