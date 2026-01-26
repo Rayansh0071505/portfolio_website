@@ -13,3 +13,6 @@ terraform\variables.tf
 demo.pem
 
 saturnintech-f3a9d60147b2.json
+
+terraform\.terraform
+backend\__pycache__
