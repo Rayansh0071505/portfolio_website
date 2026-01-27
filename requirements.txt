@@ -1,0 +1,28 @@
+# Core
+fastapi
+uvicorn
+python-dotenv
+redis
+boto3  # AWS SDK for Parameter Store
+
+# LangChain & LangGraph
+langchain
+langchain-community
+langchain-core
+langchain-pinecone
+langchain-groq
+langchain-google-vertexai
+langgraph
+langgraph-checkpoint-redis
+
+# Vector Database
+pinecone-client
+
+# Embeddings
+sentence-transformers
+transformers
+torch
+
+# Utilities
+pydantic
+numpy
