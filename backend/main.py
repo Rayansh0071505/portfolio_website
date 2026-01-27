@@ -53,7 +53,8 @@ CLOUDFRONT_DOMAIN = os.getenv("CLOUDFRONT_DOMAIN", "")
 CUSTOM_DOMAIN = os.getenv("CUSTOM_DOMAIN", "")
 
 # Build allowed origins list
-ALLOWED_ORIGINS = []
+origin = os.getenv("ORIGIN")
+ALLOWED_ORIGINS = [origin]
 
 # Development origins
 if not IS_PRODUCTION:
@@ -491,8 +492,8 @@ async def unblock_ip(ip_address: str):
         raise HTTPException(status_code=404, detail=f"IP {ip_address} is not blocked")
 
 # ============================================================================
-# RUN SERVER
-# ============================================================================
+# RUN SERVERS
+# ===========================================================================
 
 if __name__ == "__main__":
     import uvicorn
