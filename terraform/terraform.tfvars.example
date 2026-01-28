@@ -1,0 +1,37 @@
+# AWS Configuration
+aws_region  = "us-east-1"
+environment = "production"
+project_name = "rayansh_portfolio"
+
+# EC2 Configuration
+instance_type          = "t3.micro"              # Free tier eligible
+key_pair_name          = "demo"                 # Your EC2 key pair (demo.pem)
+instance_root_volume_size = 30                  # 30GB free tier
+
+# VPC Configuration
+vpc_cidr            = "10.0.0.0/16"
+public_subnet_cidr  = "10.0.1.0/24"
+private_subnet_cidr = "10.0.2.0/24"
+
+# S3 Configuration (bucket names use hyphens, not underscores)
+bucket_prefix    = "rayansh-portfolio"
+enable_versioning = true
+
+# CloudFront Configuration
+cloudfront_enabled = true
+custom_domain     = ""                          # Leave empty - GitHub Actions will auto-discover
+
+# Backend Configuration
+backend_port = 8080
+
+# Docker Image: GitHub Actions will auto-build and push to ECR
+# Format: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest
+# Replace ACCOUNT_ID with: aws sts get-caller-identity --query Account --output text
+docker_image = "123456789.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest"
+
+# CORS Configuration
+allowed_origins = []
+
+# CloudFront Secret - MUST match GitHub secret CLOUDFRONT_SECRET
+# Generate with: openssl rand -hex 32
+cloudfront_secret = "PASTE_CLOUDFRONT_SECRET_HERE"

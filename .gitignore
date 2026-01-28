@@ -16,3 +16,6 @@ saturnintech-f3a9d60147b2.json
 
 terraform\.terraform
 backend\__pycache__
+backend\.env
+cloudfront_secret.txt
+terraform_state_bucket.txt

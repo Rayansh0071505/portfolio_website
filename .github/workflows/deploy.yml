@@ -1,0 +1,235 @@
+name: Deploy Frontend and Backend
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'project/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  # Job 1: Build and Push Docker Image to ECR
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-uri: ${{ steps.image.outputs.image-uri }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/rayansh_portfolio:latest
+            ${{ steps.login-ecr.outputs.registry }}/rayansh_portfolio:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image URI
+        id: image
+        run: |
+          REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          IMAGE_URI="$REGISTRY/rayansh_portfolio:${{ github.sha }}"
+          echo "image-uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+  # Job 2: Get CloudFront Domain
+  get-cloudfront-domain:
+    name: Get CloudFront Domain from Terraform
+    runs-on: ubuntu-latest
+    outputs:
+      cloudfront-domain: ${{ steps.get-domain.outputs.domain }}
+      cloudfront-id: ${{ steps.get-id.outputs.id }}
+      s3-bucket: ${{ steps.get-bucket.outputs.bucket }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get CloudFront Domain
+        id: get-domain
+        run: |
+          DOMAIN=$(aws cloudfront list-distributions --query 'DistributionList.Items[?contains(Comment, `rayansh`) && contains(Comment, `portfolio`)].DomainName' --output text | head -1)
+          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+          echo "CloudFront Domain: $DOMAIN"
+
+      - name: Get Distribution ID
+        id: get-id
+        run: |
+          ID=$(aws cloudfront list-distributions --query 'DistributionList.Items[?contains(Comment, `rayansh`) && contains(Comment, `portfolio`)].Id' --output text | head -1)
+          echo "id=$ID" >> $GITHUB_OUTPUT
+          echo "Distribution ID: $ID"
+
+      - name: Get S3 Bucket
+        id: get-bucket
+        run: |
+          BUCKET=$(aws s3 ls | grep rayansh-portfolio-frontend | awk '{print $3}')
+          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
+          echo "S3 Bucket: $BUCKET"
+
+  # Job 3: Deploy Frontend to S3
+  deploy-frontend:
+    name: Deploy Frontend to S3
+    runs-on: ubuntu-latest
+    needs: get-cloudfront-domain
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Build frontend
+        run: |
+          cd project
+          npm install --legacy-peer-deps
+          npm run build
+        env:
+          VITE_API_URL: https://${{ needs.get-cloudfront-domain.outputs.cloudfront-domain }}/api
+          REACT_APP_API_URL: https://${{ needs.get-cloudfront-domain.outputs.cloudfront-domain }}/api
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync project/dist s3://${{ needs.get-cloudfront-domain.outputs.s3-bucket }}/ \
+            --delete \
+            --cache-control "public, max-age=3600" \
+            --exclude "index.html" \
+            --exclude "*.html"
+
+          aws s3 sync project/dist s3://${{ needs.get-cloudfront-domain.outputs.s3-bucket }}/ \
+            --cache-control "public, max-age=0, must-revalidate" \
+            --include "index.html" \
+            --include "*.html"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ needs.get-cloudfront-domain.outputs.cloudfront-id }} \
+            --paths "/*"
+
+      - name: Frontend deployment summary
+        run: echo "✅ Frontend deployed to https://${{ needs.get-cloudfront-domain.outputs.cloudfront-domain }}"
+
+  # Job 4: Deploy Backend to EC2
+  deploy-backend:
+    name: Deploy Backend to EC2
+    runs-on: ubuntu-latest
+    needs: build-docker
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get EC2 instance IP
+        id: get-ip
+        run: |
+          EC2_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=rayansh_portfolio-backend" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "ec2-ip=$EC2_IP" >> $GITHUB_OUTPUT
+          echo "Backend IP: $EC2_IP"
+
+      - name: Deploy with SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ steps.get-ip.outputs.ec2-ip }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /opt/backend
+
+            # Login to ECR
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+              docker login --username AWS --password-stdin \
+              $(aws sts get-caller-identity --query Account --output text).dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+            # Pull and run new image
+            docker pull ${{ needs.build-docker.outputs.image-uri }}
+            docker-compose down --remove-orphans
+            docker-compose up -d
+
+            sleep 5
+            curl -f http://localhost:8080/ || exit 1
+            echo "✅ Backend running"
+
+      - name: Backend deployment summary
+        run: |
+          echo "Backend deployed successfully"
+
+  # Job 5: Verify Deployment
+  verify:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-frontend, deploy-backend, get-cloudfront-domain]
+    if: success()
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify Frontend
+        run: |
+          DOMAIN=${{ needs.get-cloudfront-domain.outputs.cloudfront-domain }}
+          echo "✅ Frontend: https://$DOMAIN"
+          curl -I https://$DOMAIN | head -5 || true
+
+      - name: Verify Backend Health
+        run: |
+          EC2_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=rayansh_portfolio-backend" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "✅ Backend: http://$EC2_IP:8080"
+          curl -I http://$EC2_IP:8080/ | head -5 || true
+
+      - name: Deployment Summary
+        run: |
+          echo "🎉 Deployment complete!"
+          echo "Frontend: https://${{ needs.get-cloudfront-domain.outputs.cloudfront-domain }}"
+          echo "Backend API: https://${{ needs.get-cloudfront-domain.outputs.cloudfront-domain }}/api/chat"
