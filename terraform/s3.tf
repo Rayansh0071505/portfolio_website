@@ -117,8 +117,9 @@ resource "aws_s3_bucket_policy" "frontend" {
 
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "frontend" {
-  count   = var.cloudfront_enabled ? 1 : 0
-  enabled = true
+  count               = var.cloudfront_enabled ? 1 : 0
+  enabled             = true
+  default_root_object = "index.html"
 
   origin {
     domain_name = aws_s3_bucket.frontend.bucket_regional_domain_name
@@ -214,6 +215,19 @@ resource "aws_cloudfront_distribution" "frontend" {
 
   # Custom domain alias
   aliases = var.custom_domain != "" ? [var.custom_domain] : []
+
+  # Custom error response for SPA routing
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
 
   # Logging
   logging_config {
