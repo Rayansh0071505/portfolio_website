@@ -172,27 +172,35 @@ jobs:
 
       - name: Deploy with SSH
         uses: appleboy/ssh-action@master
+        env:
+          IMAGE_URI: ${{ needs.build-docker.outputs.image-uri }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         with:
           host: ${{ steps.get-ip.outputs.ec2-ip }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          envs: IMAGE_URI,AWS_REGION
           script: |
             set -e
             cd /opt/backend
 
-            # Login to ECR
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-              docker login --username AWS --password-stdin \
-              $(aws sts get-caller-identity --query Account --output text).dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+            # Get AWS account ID
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-            # Pull and run new image
-            docker pull ${{ needs.build-docker.outputs.image-uri }}
+            # Login to ECR
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+
+            # Pull new image
+            docker pull ${IMAGE_URI}
+
+            # Restart containers
             docker-compose down --remove-orphans
             docker-compose up -d
 
-            sleep 5
+            # Wait and verify
+            sleep 10
             curl -f http://localhost:8080/ || exit 1
-            echo "✅ Backend running"
+            echo "Backend deployed successfully"
 
       - name: Backend deployment summary
         run: |
