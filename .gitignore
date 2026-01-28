@@ -25,3 +25,7 @@ terraform/.terraform.lock.hcl
 terraform/tfplan
 terraform/*.tfstate
 terraform/*.tfstate.backup
+
+terraform
+
+.github\workflows\infrastructure.yml
