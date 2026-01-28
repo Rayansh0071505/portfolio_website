@@ -91,7 +91,7 @@ jobs:
           TF_INPUT: false
 
       - name: Save Terraform Plan
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: terraform/tfplan
@@ -132,7 +132,7 @@ jobs:
 
       - name: Upload Outputs
         if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
           path: terraform/outputs.json
@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload Infrastructure Info
         if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: infrastructure-info
           path: infrastructure-info/
@@ -161,7 +161,7 @@ jobs:
 
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Prepare Summary
         run: |
