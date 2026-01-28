@@ -172,14 +172,10 @@ jobs:
 
       - name: Deploy with SSH
         uses: appleboy/ssh-action@master
-        env:
-          IMAGE_URI: ${{ needs.build-docker.outputs.image-uri }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         with:
           host: ${{ steps.get-ip.outputs.ec2-ip }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          envs: IMAGE_URI,AWS_REGION
           script: |
             set -e
             cd /opt/backend
@@ -190,8 +186,11 @@ jobs:
             # Login to ECR
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
 
-            # Pull new image
-            docker pull ${IMAGE_URI}
+            # Pull latest image
+            docker pull ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest
+
+            # Update docker-compose image reference
+            export DOCKER_IMAGE=${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest
 
             # Restart containers
             docker-compose down --remove-orphans
