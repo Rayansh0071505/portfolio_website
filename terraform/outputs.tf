@@ -109,7 +109,7 @@ output "custom_domain_certificate_arn" {
 # SSH connection info
 output "ssh_command" {
   description = "SSH command to connect to backend"
-  value       = "ssh -i your-key.pem ec2-user@${aws_eip.backend.public_ip}"
+  value       = "ssh -i demo.pem ec2-user@${aws_eip.backend.public_ip}"
 }
 
 # Important configuration for environment variables

@@ -19,3 +19,9 @@ backend\__pycache__
 backend\.env
 cloudfront_secret.txt
 terraform_state_bucket.txt
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/tfplan
+terraform/*.tfstate
+terraform/*.tfstate.backup
