@@ -231,10 +231,22 @@ jobs:
               --restart unless-stopped \
               ${IMAGE_NAME}
 
-            # Wait and verify
-            sleep 10
-            curl -f http://localhost:8080/ || exit 1
-            echo "Backend deployed successfully"
+            # Wait for backend to be ready (max 60 seconds)
+            echo "Waiting for backend to start..."
+            for i in {1..30}; do
+              if curl -f http://localhost:8080/ 2>/dev/null; then
+                echo "Backend is ready!"
+                exit 0
+              fi
+              echo "Attempt $i/30: Backend not ready yet, waiting..."
+              sleep 2
+            done
+
+            # If we get here, backend didn't start
+            echo "Backend failed to start after 60 seconds"
+            echo "Container logs:"
+            docker logs backend_api --tail 50
+            exit 1
 
       - name: Backend deployment summary
         run: |
