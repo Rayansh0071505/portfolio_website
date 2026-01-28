@@ -1,14 +1,7 @@
 name: Infrastructure Management
 
 on:
-  push:
-    branches:
-      - master
-      - main
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/infrastructure.yml'
-  workflow_dispatch:
+  workflow_dispatch:  # Only manual trigger, never automatic
     inputs:
       action:
         description: 'Action to perform'
