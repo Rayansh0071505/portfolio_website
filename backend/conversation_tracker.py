@@ -321,7 +321,7 @@ class ConversationTracker:
         """No longer needed - we ask for both name and contact together"""
         return False
 
-    def extract_name_from_message(self, message: str) -> Optional[str]:
+    def extract_name_from_message(self, message: str, session: Optional[Dict] = None) -> Optional[str]:
         """Try to extract name from user message"""
         # Simple patterns for name extraction
         lower_msg = message.lower().strip()
@@ -349,8 +349,7 @@ class ConversationTracker:
                     return ' '.join(name_words).strip('.,!?')
 
         # If message is just a single word/name after we asked for it
-        session = self.get_session()
-        if session.get("asked_for_name") and not session.get("user_name"):
+        if session and session.get("asked_for_name") and not session.get("user_name"):
             # Check if message is short (likely just a name)
             words = message.strip().split()
             if 1 <= len(words) <= 3 and not any(char in message for char in ['@', 'http', '?', '!']):

@@ -267,7 +267,7 @@ async def chat(chat_request: ChatRequest, request: Request, background_tasks: Ba
             await tracker.set_user_ip(client_ip)
 
         # Extract name, LinkedIn, or email from message if present
-        extracted_name = tracker.extract_name_from_message(chat_request.message)
+        extracted_name = tracker.extract_name_from_message(chat_request.message, session)
         if extracted_name and not session.get("user_name"):
             await tracker.set_user_name(extracted_name)
 
