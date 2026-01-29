@@ -186,18 +186,15 @@ jobs:
             cd /opt/backend
             sudo chown -R ec2-user:ec2-user /opt/backend
 
-            # Always get latest .env from Parameter Store
-            echo "Fetching latest .env from Parameter Store..."
-            aws ssm get-parameter --name "/rayansh_portfolio/env" --region us-east-1 --query 'Parameter.Value' --output text > .env
-
-            # Verify .env was created
-            if [ -f .env ]; then
-              echo "✅ .env file created successfully"
-              echo "File size: $(wc -c < .env) bytes"
-              echo "Contains REDIS_SECRET: $(grep -c REDIS_SECRET .env || echo 0) line(s)"
+            # Check if .env exists, only fetch if missing
+            if [ ! -f .env ]; then
+              echo "Fetching .env from Parameter Store (first time)..."
+              timeout 10 aws ssm get-parameter --name "/rayansh_portfolio/env" --region us-east-1 --query 'Parameter.Value' --output text > .env 2>&1 || {
+                echo "❌ Failed to fetch .env"
+                exit 1
+              }
             else
-              echo "❌ ERROR: .env file not created!"
-              exit 1
+              echo "✅ .env already exists ($(wc -c < .env) bytes) - skipping fetch"
             fi
 
             # Get AWS account ID
