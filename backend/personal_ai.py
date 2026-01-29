@@ -384,16 +384,18 @@ async def create_rayansh_agent(use_backup: bool = False):
     checkpointer = MemorySaver()
     logger.info("✅ MemorySaver initialized (in-memory conversation history)")
 
-    # Create agent using modern create_agent pattern
+    # Create agent (LangGraph pattern - first param is positional)
     agent = create_agent(
+        llm,  # positional parameter
         tools=tools,
-        model=llm,
         system_prompt=SYSTEM_PROMPT,
-        checkpointer=checkpointer,
     )
 
-    logger.info("✅ LangGraph agent created successfully")
-    return agent, checkpointer
+    # Compile with checkpointer for conversation memory
+    app = agent.compile(checkpointer=checkpointer)
+    logger.info("✅ LangGraph agent compiled with MemorySaver for conversation history")
+
+    return app, checkpointer
 
 
 # ============================================================================
