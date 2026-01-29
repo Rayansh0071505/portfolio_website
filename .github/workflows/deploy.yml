@@ -183,6 +183,7 @@ jobs:
             # Create directory if it doesn't exist
             sudo mkdir -p /opt/backend
             cd /opt/backend
+            sudo chown -R ec2-user:ec2-user /opt/backend
 
             # Always get latest .env from Parameter Store
             echo "Fetching latest .env from Parameter Store..."
