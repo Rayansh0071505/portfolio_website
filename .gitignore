@@ -30,3 +30,8 @@ terraform
 
 .github\workflows\infrastructure.yml
 venv
+
+terraform\terraform.tfvars
+*.tfvars
+.terraform/
+.terraform.lock.hcl
