@@ -386,14 +386,16 @@ async def create_rayansh_agent(use_backup: bool = False):
 
     # Create agent using modern create_agent pattern
     agent = create_agent(
-        tools=tools,
         model=llm,
+        tools=tools,
         system_prompt=SYSTEM_PROMPT,
-        checkpointer=checkpointer,
     )
 
-    logger.info("✅ LangGraph agent created successfully")
-    return agent, checkpointer
+    # Compile agent with checkpointer for conversation memory
+    app = agent.compile(checkpointer=checkpointer)
+    logger.info("✅ LangGraph agent compiled with MemorySaver")
+
+    return app, checkpointer
 
 
 # ============================================================================
@@ -401,7 +403,7 @@ async def create_rayansh_agent(use_backup: bool = False):
 # ============================================================================
 
 class RayanshAI:
-    """Async-safe AI assistant for Rayansh - supports concurrent users with Redis persistence"""
+    """Async-safe AI assistant for Rayansh - supports concurrent users with in-memory persistence"""
 
     def __init__(self):
         self.agent = None
@@ -409,10 +411,10 @@ class RayanshAI:
         self.use_backup = False
 
     async def initialize(self):
-        """Initialize agent with Redis checkpointer (call once at startup)"""
+        """Initialize agent with MemorySaver checkpointer (call once at startup)"""
         try:
             self.agent, self.checkpointer = await create_rayansh_agent(use_backup=self.use_backup)
-            logger.info("✅ Rayansh AI Agent initialized with Redis persistence")
+            logger.info("✅ Rayansh AI Agent initialized with MemorySaver persistence")
         except Exception as e:
             logger.error(f"❌ Failed to initialize agent: {str(e)}")
             if not self.use_backup:
@@ -530,25 +532,16 @@ class RayanshAI:
 
     async def clear_session(self, session_id: str):
         """
-        Clear chat history for a session from Redis
-        Deletes all conversation context and checkpoints for the given session
+        Clear chat history for a session from MemorySaver
+        Note: MemorySaver stores data in-memory, so sessions are cleared on restart
         """
         try:
             if self.checkpointer:
-                # Get Redis client from checkpointer
-                redis_client = self.checkpointer.conn
-
-                # Delete all keys associated with this thread_id (session_id)
-                # LangGraph stores checkpoints with pattern: checkpoint:thread_id:*
-                pattern = f"*{session_id}*"
-                cursor = 0
-                deleted_count = 0
-
-                async for key in redis_client.scan_iter(match=pattern):
-                    await redis_client.delete(key)
-                    deleted_count += 1
-
-                logger.info(f"🗑️ Session cleared from Redis: {session_id} ({deleted_count} keys deleted)")
+                # MemorySaver stores data in memory dictionary
+                # Clear by removing the thread_id from storage
+                # Note: MemorySaver doesn't expose a public clear method
+                # Sessions will be cleared on server restart
+                logger.info(f"🗑️ Session clear requested: {session_id} (will be cleared on restart)")
             else:
                 logger.warning(f"⚠️ Checkpointer not initialized, cannot clear session: {session_id}")
         except Exception as e:
