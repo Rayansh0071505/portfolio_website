@@ -184,11 +184,9 @@ jobs:
             sudo mkdir -p /opt/backend
             cd /opt/backend
 
-            # Get .env from Parameter Store if not exists
-            if [ ! -f .env ]; then
-              echo "Fetching .env from Parameter Store..."
-              aws ssm get-parameter --name "/rayansh_portfolio/env" --region us-east-1 --query 'Parameter.Value' --output text > .env
-            fi
+            # Always get latest .env from Parameter Store
+            echo "Fetching latest .env from Parameter Store..."
+            aws ssm get-parameter --name "/rayansh_portfolio/env" --region us-east-1 --query 'Parameter.Value' --output text > .env
 
             # Get AWS account ID
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)

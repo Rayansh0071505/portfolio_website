@@ -138,10 +138,12 @@ resource "aws_cloudfront_distribution" "frontend" {
     origin_path = ""
 
     custom_origin_config {
-      http_port              = var.backend_port
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+      http_port                = var.backend_port
+      https_port               = 443
+      origin_protocol_policy   = "http-only"
+      origin_ssl_protocols     = ["TLSv1.2"]
+      origin_read_timeout      = 60  # Wait up to 60 seconds for AI response
+      origin_keepalive_timeout = 60  # Keep connection alive for 60 seconds
     }
 
     custom_header {
