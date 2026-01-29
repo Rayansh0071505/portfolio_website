@@ -387,7 +387,7 @@ async def create_rayansh_agent(use_backup: bool = False):
         raise ValueError("REDIS_SECRET not found in config or environment")
 
     # Create async Redis checkpointer with TTL (auto-expire after 24 hours)
-    checkpointer = AsyncRedisSaver.from_conn_string(
+    checkpointer = await AsyncRedisSaver.from_conn_string(
         redis_url,
         ttl={
             "default_ttl": 1440,  # 24 hours in minutes
@@ -525,18 +525,22 @@ class RayanshAI:
         except Exception as e:
             logger.error(f"❌ Error in chat: {str(e)}")
 
+            elapsed_time = time.time() - start_time
+
             # Fallback to backup LLM if primary fails
             if not self.use_backup:
                 logger.info("🔄 Primary LLM (Vertex AI) failed, switching to backup (Groq)...")
                 self.use_backup = True
-                self.agent = create_rayansh_agent(use_backup=True)
+                self.agent, self.checkpointer = await create_rayansh_agent(use_backup=True)
                 return await self.chat(message, session_id, user_name)
 
             return {
                 "message": "I apologize, but I'm experiencing technical difficulties. Please try again.",
                 "error": str(e),
                 "session_id": session_id,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "response_time": f"{elapsed_time:.2f}s",
+                "model": "Error"
             }
 
     async def clear_session(self, session_id: str):
