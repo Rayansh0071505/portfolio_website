@@ -18,9 +18,9 @@ variable "project_name" {
 
 # EC2 Configuration
 variable "instance_type" {
-  description = "EC2 instance type (free tier: t2.micro, t3.micro)"
+  description = "EC2 instance type (free tier: t3.micro, t3.small, m7i-flex.large)"
   type        = string
-  default     = "t3.micro"
+  default     = "m7i-flex.large"  # 8 GiB RAM for embeddings model
 }
 
 variable "key_pair_name" {

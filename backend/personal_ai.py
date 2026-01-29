@@ -409,10 +409,20 @@ class RayanshAI:
         self.use_backup = False
 
     async def initialize(self):
-        """Initialize agent with Redis checkpointer (call once at startup)"""
+        """Initialize agent and pre-load embeddings model (call once at startup)"""
         try:
             self.agent, self.checkpointer = await create_rayansh_agent(use_backup=self.use_backup)
-            logger.info("✅ Rayansh AI Agent initialized with Redis persistence")
+            logger.info("✅ Rayansh AI Agent initialized with MemorySaver persistence")
+
+            # Pre-load embeddings model to avoid 35s delay on first RAG query
+            logger.info("🔄 Pre-loading embeddings model...")
+            try:
+                get_vector_store()
+                logger.info("✅ Embeddings model pre-loaded (RAG queries will be fast)")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to pre-load embeddings: {e}")
+                logger.info("RAG will lazy-load embeddings on first query")
+
         except Exception as e:
             logger.error(f"❌ Failed to initialize agent: {str(e)}")
             if not self.use_backup:
