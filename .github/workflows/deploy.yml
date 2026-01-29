@@ -189,6 +189,16 @@ jobs:
             echo "Fetching latest .env from Parameter Store..."
             aws ssm get-parameter --name "/rayansh_portfolio/env" --region us-east-1 --query 'Parameter.Value' --output text > .env
 
+            # Verify .env was created
+            if [ -f .env ]; then
+              echo "✅ .env file created successfully"
+              echo "File size: $(wc -c < .env) bytes"
+              echo "Contains REDIS_SECRET: $(grep -c REDIS_SECRET .env || echo 0) line(s)"
+            else
+              echo "❌ ERROR: .env file not created!"
+              exit 1
+            fi
+
             # Get AWS account ID
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
             IMAGE_NAME="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest"
@@ -226,7 +236,7 @@ jobs:
               -p 8080:8080 \
               -e PYTHONUNBUFFERED=1 \
               -e REDIS_URL=redis://backend_redis:6379 \
-              --env-file .env \
+              --env-file /opt/backend/.env \
               -v /data:/app/data \
               --restart unless-stopped \
               ${IMAGE_NAME}
