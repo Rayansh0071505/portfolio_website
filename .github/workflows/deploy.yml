@@ -209,33 +209,15 @@ jobs:
             # Pull latest image
             docker pull ${IMAGE_NAME}
 
-            # Create network if it doesn't exist
-            docker network create backend_network 2>/dev/null || true
-
-            # Create volume if it doesn't exist
-            docker volume create redis_data 2>/dev/null || true
-
-            # Stop existing containers
+            # Stop existing container
             docker stop backend_api 2>/dev/null || true
-            docker stop backend_redis 2>/dev/null || true
             docker rm backend_api 2>/dev/null || true
-            docker rm backend_redis 2>/dev/null || true
 
-            # Start Redis
-            docker run -d \
-              --name backend_redis \
-              --network backend_network \
-              -v redis_data:/data \
-              --restart always \
-              redis:7-alpine redis-server --appendonly yes
-
-            # Start Backend
+            # Start Backend (no Redis needed - using in-memory storage)
             docker run -d \
               --name backend_api \
-              --network backend_network \
               -p 8080:8080 \
               -e PYTHONUNBUFFERED=1 \
-              -e REDIS_URL=redis://backend_redis:6379 \
               --env-file /opt/backend/.env \
               -v /data:/app/data \
               --restart unless-stopped \

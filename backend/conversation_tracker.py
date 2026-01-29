@@ -11,30 +11,18 @@ import requests
 import base64
 import json
 import tempfile
-import redis.asyncio as redis_async
 from langchain_groq import ChatGroq
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from config import get_redis_secret, get_groq_api_key, get_google_key, get_mailgun_domain, get_mailgun_secret
+from config import get_groq_api_key, get_google_key, get_mailgun_domain, get_mailgun_secret
 
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# REDIS CONNECTION FOR SESSION STORAGE
+# IN-MEMORY SESSION STORAGE (replaces Redis)
 # ============================================================================
 
-_redis_client = None
-
-async def get_redis_client():
-    """Get Redis client for session storage"""
-    global _redis_client
-    if _redis_client is None:
-        redis_url = get_redis_secret()
-        if not redis_url:
-            raise ValueError("REDIS_SECRET not found in config or environment")
-        _redis_client = redis_async.from_url(redis_url, decode_responses=True)
-        logger.info("✅ Redis client initialized for session storage")
-    return _redis_client
+_sessions = {}  # Global in-memory session store
 
 # ============================================================================
 # AI MODELS FOR EMAIL SUMMARY GENERATION
@@ -192,116 +180,57 @@ Provide a concise summary suitable for an email notification."""
         return f"Conversation with {user_name} - {len(messages)} messages exchanged."
 
 class ConversationTracker:
-    """Track conversation state and collect user info using Redis"""
+    """Track conversation state and collect user info using in-memory storage"""
 
     def __init__(self, session_id: str):
         self.session_id = session_id
-        self.redis_key = f"session:{session_id}"
-        self._redis_client = None
-
-    async def _get_redis(self):
-        """Get Redis client (lazy initialization)"""
-        if self._redis_client is None:
-            self._redis_client = await get_redis_client()
-        return self._redis_client
 
     async def initialize(self):
-        """Initialize session in Redis if not exists"""
-        redis_client = await self._get_redis()
-
-        # Check if session exists
-        exists = await redis_client.exists(self.redis_key)
-
-        if not exists:
-            # Create new session with 24 hour expiration
-            session_data = {
-                "messages": json.dumps([]),
+        """Initialize session in memory if not exists"""
+        global _sessions
+        if self.session_id not in _sessions:
+            # Create new session
+            _sessions[self.session_id] = {
+                "messages": [],
                 "message_count": 0,
-                "user_name": "",
-                "user_linkedin": "",
-                "user_email": "",
-                "user_ip": "",
-                "asked_for_name": "false",
-                "asked_for_linkedin": "false",
+                "user_name": None,
+                "user_linkedin": None,
+                "user_email": None,
+                "user_ip": None,
+                "asked_for_name": False,
+                "asked_for_linkedin": False,
                 "started_at": datetime.now().isoformat(),
                 "last_activity": datetime.now().isoformat()
             }
-            await redis_client.hset(self.redis_key, mapping=session_data)
-            # Set expiration to 24 hours
-            await redis_client.expire(self.redis_key, 86400)
-            logger.info(f"📝 New session created in Redis: {self.session_id}")
+            logger.info(f"📝 New session created in memory: {self.session_id}")
 
     async def get_session(self) -> Dict:
-        """Get session data from Redis"""
-        try:
-            redis_client = await self._get_redis()
-            data = await redis_client.hgetall(self.redis_key)
-
-            if not data:
-                return {}
-
-            # Convert Redis hash to dict with proper types
-            return {
-                "messages": json.loads(data.get("messages", "[]")),
-                "message_count": int(data.get("message_count", 0)),
-                "user_name": data.get("user_name") or None,
-                "user_linkedin": data.get("user_linkedin") or None,
-                "user_email": data.get("user_email") or None,
-                "user_ip": data.get("user_ip") or None,
-                "asked_for_name": data.get("asked_for_name") == "true",
-                "asked_for_linkedin": data.get("asked_for_linkedin") == "true",
-                "started_at": data.get("started_at"),
-                "last_activity": data.get("last_activity")
-            }
-        except Exception as e:
-            logger.error(f"❌ Error getting session from Redis: {str(e)}")
-            return {}
+        """Get session data from memory"""
+        global _sessions
+        return _sessions.get(self.session_id, {})
 
     async def update_session(self, **kwargs):
-        """Update session data in Redis"""
-        try:
-            redis_client = await self._get_redis()
-
-            # Prepare updates
-            updates = {}
-            for key, value in kwargs.items():
-                if isinstance(value, bool):
-                    updates[key] = "true" if value else "false"
-                elif isinstance(value, (list, dict)):
-                    updates[key] = json.dumps(value)
-                else:
-                    updates[key] = str(value) if value is not None else ""
-
-            # Always update last_activity
-            updates["last_activity"] = datetime.now().isoformat()
-
-            # Update Redis hash
-            await redis_client.hset(self.redis_key, mapping=updates)
-
-            # Refresh expiration to 24 hours
-            await redis_client.expire(self.redis_key, 86400)
-
-        except Exception as e:
-            logger.error(f"❌ Error updating session in Redis: {str(e)}")
+        """Update session data in memory"""
+        global _sessions
+        if self.session_id in _sessions:
+            _sessions[self.session_id].update(kwargs)
+            _sessions[self.session_id]["last_activity"] = datetime.now().isoformat()
 
     async def add_message(self, role: str, content: str):
-        """Add message to conversation history in Redis"""
-        try:
-            session = await self.get_session()
-            messages = session.get("messages", [])
-            messages.append({
-                "role": role,
-                "content": content,
-                "timestamp": datetime.now().isoformat()
-            })
+        """Add message to conversation history in memory"""
+        session = await self.get_session()
+        messages = session.get("messages", [])
+        messages.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now().isoformat()
+        })
 
-            # Update Redis with new message and incremented count
-            await self.update_session(
-                messages=messages,
-                message_count=session.get("message_count", 0) + 1
-            )
-        except Exception as e:
-            logger.error(f"❌ Error adding message to Redis: {str(e)}")
+        # Update memory with new message and incremented count
+        await self.update_session(
+            messages=messages,
+            message_count=session.get("message_count", 0) + 1
+        )
 
     async def get_message_count(self) -> int:
         """Get current message count from Redis"""
@@ -456,16 +385,13 @@ END OF CONVERSATION
         return summary
 
     async def delete_session(self):
-        """Delete session from Redis"""
-        try:
-            redis_client = await self._get_redis()
-            deleted = await redis_client.delete(self.redis_key)
-            if deleted:
-                logger.info(f"🗑️ Session deleted from Redis: {self.session_id}")
-            else:
-                logger.warning(f"⚠️ Session not found in Redis: {self.session_id}")
-        except Exception as e:
-            logger.error(f"❌ Error deleting session from Redis: {str(e)}")
+        """Delete session from memory"""
+        global _sessions
+        if self.session_id in _sessions:
+            del _sessions[self.session_id]
+            logger.info(f"🗑️ Session deleted from memory: {self.session_id}")
+        else:
+            logger.warning(f"⚠️ Session not found in memory: {self.session_id}")
 
 
 async def send_conversation_email(session_id: str):
@@ -685,33 +611,36 @@ CONVERSATION TRANSCRIPT
 
 
 async def cleanup_old_sessions(max_age_hours: int = 24):
-    """Clean up sessions older than max_age_hours from Redis"""
+    """Clean up sessions older than max_age_hours from memory"""
     try:
         from datetime import timedelta
+        global _sessions
 
-        redis_client = await get_redis_client()
         current_time = datetime.now()
         deleted_count = 0
 
-        # Scan all session keys
-        async for key in redis_client.scan_iter(match="session:*"):
+        # Scan all sessions
+        sessions_to_delete = []
+        for session_id, session_data in _sessions.items():
             try:
-                # Get last_activity from session
-                last_activity_str = await redis_client.hget(key, "last_activity")
-
+                last_activity_str = session_data.get("last_activity")
                 if last_activity_str:
                     last_activity = datetime.fromisoformat(last_activity_str)
                     age = current_time - last_activity
 
                     if age > timedelta(hours=max_age_hours):
-                        await redis_client.delete(key)
-                        deleted_count += 1
-                        logger.info(f"🗑️ Cleaned up old session: {key}")
+                        sessions_to_delete.append(session_id)
             except Exception as e:
-                logger.error(f"❌ Error processing session {key}: {str(e)}")
+                logger.error(f"❌ Error processing session {session_id}: {str(e)}")
+
+        # Delete old sessions
+        for session_id in sessions_to_delete:
+            del _sessions[session_id]
+            deleted_count += 1
+            logger.info(f"🗑️ Cleaned up old session: {session_id}")
 
         if deleted_count > 0:
-            logger.info(f"✅ Cleaned up {deleted_count} old sessions from Redis")
+            logger.info(f"✅ Cleaned up {deleted_count} old sessions from memory")
 
     except Exception as e:
         logger.error(f"❌ Error cleaning sessions: {str(e)}")

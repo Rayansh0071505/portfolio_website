@@ -16,14 +16,12 @@ from langchain_google_vertexai import ChatVertexAI
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.agents import create_agent
-from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langchain_pinecone import PineconeVectorStore
-import redis.asyncio as redis_async
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from pinecone import Pinecone
 import os
 from dotenv import load_dotenv
-from config import get_redis_secret, get_groq_api_key, get_google_key, get_pinecone_api_key
+from config import get_groq_api_key, get_google_key, get_pinecone_api_key
 
 load_dotenv()
 
@@ -381,15 +379,10 @@ async def create_rayansh_agent(use_backup: bool = False):
     # Define tools
     tools = [search_rayansh_knowledge]
 
-    # Create Redis checkpointer for persistent memory
-    redis_url = get_redis_secret()
-    if not redis_url:
-        raise ValueError("REDIS_SECRET not found in config or environment")
-
-    # Initialize AsyncRedisSaver with redis_url (correct pattern from docs)
-    checkpointer = AsyncRedisSaver(redis_url=redis_url)
-    await checkpointer.asetup()
-    logger.info("✅ Redis checkpointer initialized")
+    # Use in-memory checkpointer (conversation history works but resets on restart)
+    from langgraph.checkpoint.memory import MemorySaver
+    checkpointer = MemorySaver()
+    logger.info("✅ MemorySaver initialized (in-memory conversation history)")
 
     # Create agent using modern create_agent pattern
     agent = create_agent(
