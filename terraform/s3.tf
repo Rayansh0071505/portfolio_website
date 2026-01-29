@@ -131,9 +131,9 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   # Backend API Origin
-  # Note: CloudFront requires a DNS name, not an IP address
+  # Use Elastic IP's public DNS (stable across instance replacements)
   origin {
-    domain_name = aws_instance.backend.public_dns
+    domain_name = aws_eip.backend.public_dns
     origin_id   = "BackendAPI"
     origin_path = ""
 
