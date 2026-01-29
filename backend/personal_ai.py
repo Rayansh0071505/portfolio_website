@@ -212,9 +212,9 @@ async def search_rayansh_knowledge(query: str) -> str:
                     seen_content.add(content_hash)
                     all_results.append((doc, score))
 
-        # Sort by relevance and take top 10
+        # Sort by relevance and take top 5 (reduced from 10 to prevent token overflow)
         all_results.sort(key=lambda x: x[1])
-        all_results = all_results[:10]
+        all_results = all_results[:5]
 
         if not all_results:
             return "No relevant information found in knowledge base."
@@ -458,6 +458,24 @@ class RayanshAI:
                     "thread_id": session_id
                 }
             }
+
+            # Trim conversation history to prevent token overflow and crashes
+            # Keep only last 3 messages to avoid memory issues
+            try:
+                state = await self.agent.aget_state(config)
+                if state and state.values and "messages" in state.values:
+                    messages = state.values["messages"]
+                    if len(messages) > 3:
+                        logger.info(f"⚠️ Trimming history: {len(messages)} → 3 messages")
+                        # Keep only last 3 messages
+                        trimmed_messages = messages[-3:]
+                        # Update state with trimmed messages
+                        await self.agent.aupdate_state(
+                            config,
+                            {"messages": trimmed_messages}
+                        )
+            except Exception as e:
+                logger.warning(f"Could not trim history: {e}")
 
             # Run agent (async with ainvoke - modern pattern)
             response = await self.agent.ainvoke(input_data, config)
