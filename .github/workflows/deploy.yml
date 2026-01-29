@@ -210,7 +210,7 @@ jobs:
             docker pull ${IMAGE_NAME}
 
             # Create CloudWatch log group if not exists
-            aws logs create-log-group --log-group-name /portfolio/backend || echo "Log group already exists"
+            aws logs create-log-group --log-group-name /rayansh_portfolio/backend --region us-east-1 2>/dev/null || echo "Log group already exists"
 
             # Stop existing container
             docker stop backend_api 2>/dev/null || true
@@ -226,7 +226,7 @@ jobs:
               --restart unless-stopped \
               --log-driver=awslogs \
               --log-opt awslogs-region=us-east-1 \
-              --log-opt awslogs-group=/portfolio/backend \
+              --log-opt awslogs-group=/rayansh_portfolio/backend \
               --log-opt awslogs-stream=backend_api \
               --log-opt awslogs-create-group=true \
               ${IMAGE_NAME}
