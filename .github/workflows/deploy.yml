@@ -181,6 +181,14 @@ jobs:
           script: |
             set -e
 
+            # Quick connectivity test
+            echo "Testing internet connectivity..."
+            timeout 5 curl -s https://aws.amazon.com > /dev/null || {
+              echo "❌ No internet connectivity!"
+              exit 1
+            }
+            echo "✅ Internet OK"
+
             # Create directory if it doesn't exist
             sudo mkdir -p /opt/backend
             cd /opt/backend
@@ -197,18 +205,34 @@ jobs:
               echo "✅ .env already exists ($(wc -c < .env) bytes) - skipping fetch"
             fi
 
-            # Get AWS account ID
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            # Get AWS account ID with timeout
+            echo "Getting AWS account ID..."
+            ACCOUNT_ID=$(timeout 10 aws sts get-caller-identity --query Account --output text) || {
+              echo "❌ Failed to get AWS account ID"
+              exit 1
+            }
             IMAGE_NAME="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest"
+            echo "✅ Image: ${IMAGE_NAME}"
 
-            # Login to ECR
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+            # Login to ECR with timeout
+            echo "Logging into ECR..."
+            timeout 30 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com || {
+              echo "❌ ECR login failed"
+              exit 1
+            }
+            echo "✅ ECR login successful"
 
-            # Pull latest image
-            docker pull ${IMAGE_NAME}
+            # Pull latest image with timeout (5 min max)
+            echo "Pulling Docker image..."
+            timeout 300 docker pull ${IMAGE_NAME} || {
+              echo "❌ Docker pull failed"
+              exit 1
+            }
+            echo "✅ Image pulled successfully"
 
-            # Create CloudWatch log group if not exists
-            aws logs create-log-group --log-group-name /rayansh_portfolio/backend --region us-east-1 2>/dev/null || echo "Log group already exists"
+            # Create CloudWatch log group (skip if fails)
+            echo "Creating CloudWatch log group..."
+            timeout 10 aws logs create-log-group --log-group-name /rayansh_portfolio/backend --region us-east-1 2>/dev/null || echo "Log group already exists"
 
             # Stop existing container
             docker stop backend_api 2>/dev/null || true
