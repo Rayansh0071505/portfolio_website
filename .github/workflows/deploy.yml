@@ -161,23 +161,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Get EC2 instance IP
-        id: get-ip
+      - name: Get deployment info
+        id: get-info
         run: |
           EC2_IP=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=rayansh_portfolio-backend" \
             --query 'Reservations[0].Instances[0].PublicIpAddress' \
             --output text)
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "ec2-ip=$EC2_IP" >> $GITHUB_OUTPUT
+          echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
           echo "Backend IP: $EC2_IP"
+          echo "Account ID: $ACCOUNT_ID"
 
       - name: Deploy with SSH
         uses: appleboy/ssh-action@master
+        env:
+          ACCOUNT_ID: ${{ steps.get-info.outputs.account-id }}
         with:
-          host: ${{ steps.get-ip.outputs.ec2-ip }}
+          host: ${{ steps.get-info.outputs.ec2-ip }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           command_timeout: 10m
+          envs: ACCOUNT_ID
           script: |
             set -e
 
@@ -205,34 +211,23 @@ jobs:
               echo "✅ .env already exists ($(wc -c < .env) bytes) - skipping fetch"
             fi
 
-            # Get AWS account ID with timeout
-            echo "Getting AWS account ID..."
-            ACCOUNT_ID=$(timeout 10 aws sts get-caller-identity --query Account --output text) || {
-              echo "❌ Failed to get AWS account ID"
-              exit 1
-            }
+            # Use AWS account ID passed from GitHub Actions
+            echo "Using AWS account ID: ${ACCOUNT_ID}"
             IMAGE_NAME="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest"
             echo "✅ Image: ${IMAGE_NAME}"
 
-            # Login to ECR with timeout
-            echo "Logging into ECR..."
-            timeout 30 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com || {
-              echo "❌ ECR login failed"
-              exit 1
-            }
-            echo "✅ ECR login successful"
+            # Check if image exists locally
+            if docker image inspect ${IMAGE_NAME} >/dev/null 2>&1; then
+              echo "✅ Image already exists locally"
 
-            # Pull latest image with timeout (5 min max)
-            echo "Pulling Docker image..."
-            timeout 300 docker pull ${IMAGE_NAME} || {
-              echo "❌ Docker pull failed"
+              # Try to pull latest (but don't fail if it doesn't work)
+              echo "Attempting to pull latest image..."
+              timeout 60 docker pull ${IMAGE_NAME} 2>&1 && echo "✅ Pulled latest image" || echo "⚠️ Using existing image (pull failed)"
+            else
+              echo "❌ Image not found locally and cannot pull (AWS CLI not available)"
+              echo "This is a new instance - need to wait for user_data to complete AWS CLI setup"
               exit 1
-            }
-            echo "✅ Image pulled successfully"
-
-            # Create CloudWatch log group (skip if fails)
-            echo "Creating CloudWatch log group..."
-            timeout 10 aws logs create-log-group --log-group-name /rayansh_portfolio/backend --region us-east-1 2>/dev/null || echo "Log group already exists"
+            fi
 
             # Stop existing container
             docker stop backend_api 2>/dev/null || true
