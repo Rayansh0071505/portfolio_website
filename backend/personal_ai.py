@@ -474,8 +474,9 @@ class RayanshAI:
                             config,
                             {"messages": trimmed_messages}
                         )
+                        logger.info(f"✅ Trimming complete")
             except Exception as e:
-                logger.warning(f"Could not trim history: {e}")
+                logger.error(f"❌ TRIMMING FAILED: {e}")
 
             # Run agent (async with ainvoke - modern pattern)
             response = await self.agent.ainvoke(input_data, config)
