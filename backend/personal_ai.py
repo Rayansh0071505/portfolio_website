@@ -387,7 +387,7 @@ async def create_rayansh_agent(use_backup: bool = False):
         raise ValueError("REDIS_SECRET not found in config or environment")
 
     # Create async Redis checkpointer with TTL (auto-expire after 24 hours)
-    checkpointer = await AsyncRedisSaver.from_conn_string(
+    checkpointer = AsyncRedisSaver.from_conn_string(
         redis_url,
         ttl={
             "default_ttl": 1440,  # 24 hours in minutes
@@ -396,8 +396,12 @@ async def create_rayansh_agent(use_backup: bool = False):
     )
 
     # Setup Redis indices (required on first use)
-    await checkpointer.asetup()
-    logger.info("✅ Redis checkpointer initialized with 24h TTL")
+    try:
+        await checkpointer.asetup()
+        logger.info("✅ Redis checkpointer initialized with 24h TTL")
+    except Exception as e:
+        logger.error(f"❌ Redis setup failed: {str(e)}")
+        raise
 
     # Create agent using modern create_agent pattern
     agent = create_agent(
