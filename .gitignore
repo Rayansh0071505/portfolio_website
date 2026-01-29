@@ -29,3 +29,4 @@ terraform/*.tfstate.backup
 terraform
 
 .github\workflows\infrastructure.yml
+venv
