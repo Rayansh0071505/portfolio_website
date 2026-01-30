@@ -23,7 +23,7 @@ WORK EXPERIENCE (TIMELINE)
 1. AI Investment and Monitoring Platform (Nov 2025 - Jan 2026)
    Position: Founding AI Engineer
    Location: Remote
-   Summary: Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Vertex AI. Hosted open-source models (Qwen 3, Kimi K2) on private servers using vLLM and Ray.
+   Summary: Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Vertex AI. Hosted open-source models (Qwen-3 Coder, LLaMA) on private servers using vLLM and Ray.
 
 2. Everest Commerce Group (Mar 2025 - Nov 2025)
    Position: AI Solution Engineer

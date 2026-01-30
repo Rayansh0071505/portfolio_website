@@ -10,7 +10,7 @@ export default function Experience() {
       achievements: [
         "Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Google Vertex AI (Gemini)",
         "Architected AWS ECS Fargate deployment with 99.9% uptime using multi-model fallback (Gemini → Groq LLaMA)",
-        "Hosted open-source models (Qwen 3, Kimi K2 thinking) on private servers using vLLM and Ray for sensitive data processing",
+        "Hosted open-source models (Qwen-3 Coder, LLaMA) on private servers using vLLM and Ray for sensitive data processing",
         "Developed persistent portfolio intelligence platform enabling cross-company queries and automated due diligence",
         "Created 4 specialized AI agents: investor research, financial analysis, book training, and personalized analyst",
         "Designed RAG pipeline with semantic search across pitch decks, websites, and investment books (Pinecone vector DB)",
@@ -40,7 +40,7 @@ export default function Experience() {
       achievements: [
         "Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Google Vertex AI (Gemini)",
         "Architected AWS ECS Fargate deployment with 99.9% uptime using multi-model fallback (Gemini → Groq LLaMA)",
-        "Hosted open-source models (Qwen 3, Kimi K2 thinking) on private servers using vLLM and Ray for sensitive data processing",
+        "Hosted open-source models (Qwen-3 Coder, LLaMA) on private servers using vLLM and Ray for sensitive data processing",
         "Developed persistent portfolio intelligence platform enabling cross-company queries and automated due diligence",
         "Created 4 specialized AI agents: investor research, financial analysis, book training, and personalized analyst",
         "Designed RAG pipeline with semantic search across pitch decks, websites, and investment books (Pinecone vector DB)",

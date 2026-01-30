@@ -61,7 +61,7 @@ WHAT I DEVELOPED
    - CI/CD via GitHub Actions
 
 4. Private LLM Hosting
-   - Hosted open-source models (Qwen 3, Kimi K2 thinking) on private servers
+   - Hosted open-source models (Qwen-3 Coder, LLaMA) on private servers
    - Used vLLM + Ray for sensitive investor data processing
    - Data sovereignty compliance
 
@@ -97,7 +97,7 @@ AI/ML:
 - LangChain & LangGraph (multi-agent orchestration)
 - Google Vertex AI Gemini 2.5 (Pro, Flash, Flash Lite)
 - Groq API (LLaMA 3.3 70B) - fallback for 99.9% uptime
-- Qwen 3 + Kimi K2 - private servers (vLLM + Ray)
+- Qwen-3 Coder + LLaMA - private servers (vLLM + Ray)
 - HuggingFace sentence-transformers (embeddings)
 - Pinecone (vector database)
 - Tavily API (web search)
@@ -150,8 +150,8 @@ DevOps:
 Private Server Infrastructure:
 - vLLM (LLM inference)
 - Ray (distributed computing)
-- Qwen 3 (open-source LLM)
-- Kimi K2 thinking (reasoning model)
+- Qwen-3 Coder (open-source LLM)
+- LLaMA models (reasoning and generation)
 
 
 KEY TECHNICAL ACHIEVEMENTS
