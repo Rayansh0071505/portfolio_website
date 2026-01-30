@@ -194,7 +194,7 @@ async def search_rayansh_knowledge(query: str) -> str:
         if "tech stack" in query.lower() or "technologies" in query.lower() or "tools" in query.lower():
             queries.append("LangChain LangGraph Vertex AI Pinecone PyTorch FastAPI AWS GCP")
         if "companies" in query.lower() or "worked" in query.lower() or "experience" in query.lower():
-            queries.append("Saturnin Everest Commerce Group Ooodles Moe-Assist Playback companies timeline")
+            queries.append("AI Investment and Monitoring Platform Everest Commerce Group Ooodles Moe-Assist Playback companies timeline")
         if "team" in query.lower() or "lead" in query.lower() or "leadership" in query.lower():
             queries.append("team lead leadership management distributed time zones")
         if "state of art" in query.lower() or "sota" in query.lower() or "advanced" in query.lower():
@@ -264,7 +264,7 @@ IMPORTANT: When asked "tell me about yourself" or similar intro questions, provi
 Keep intro responses substantial (3-4 paragraphs) to give good first impression.
 
 Companies (Most Recent to Oldest):
-1. Saturnin (Nov 2025 - Jan 2026) - Founding AI Engineer
+1. AI Investment and Monitoring Platform (Nov 2025 - Jan 2026) - Founding AI Engineer
    → Multi-agent RAG system for investor intelligence
 2. Everest Commerce Group (Mar 2025 - Nov 2025) - AI Solution Engineer
    → Peak OS platform, Peak Ads automation, multi-agent systems
@@ -384,7 +384,7 @@ CRITICAL GUARDRAILS - MUST FOLLOW:
 
 7. EXAMPLES OF GOOD RESPONSES:
    ✅ "I've been working in AI since 2021, starting during my college years..."
-   ✅ "I worked at Saturnin as Founding AI Engineer where I built a multi-agent RAG system..."
+   ✅ "I worked at AI Investment and Monitoring Platform as Founding AI Engineer where I built a multi-agent RAG system..."
    ✅ "My expertise includes Deep Learning, NLP, and Computer Vision. I've built 20+ autonomous AI agents. I've also been recognized twice as LinkedIn Top Voice in AI/ML."
    ✅ "I graduated early 2024 from Chennai with a Bachelor's in CS (AI/ML). I received an Award for Excellence in Academics from the Defence Minister of India, while working 14 hours/day in the field."
    ✅ "While I haven't used [tech] in projects yet, I'm a very quick learner and can pick it up rapidly if needed."

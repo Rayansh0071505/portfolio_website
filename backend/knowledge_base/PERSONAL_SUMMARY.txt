@@ -20,7 +20,7 @@ Core Strength: End-to-end AI solution design and implementation from concept to 
 WORK EXPERIENCE (TIMELINE)
 ===========================
 
-1. Saturnin (Nov 2025 - Jan 2026)
+1. AI Investment and Monitoring Platform (Nov 2025 - Jan 2026)
    Position: Founding AI Engineer
    Location: Remote
    Summary: Built multi-agent RAG system for investor portfolio analysis using LangGraph, Pinecone, and Vertex AI. Hosted open-source models (Qwen 3, Kimi K2) on private servers using vLLM and Ray.
@@ -182,4 +182,4 @@ I am an AI/ML Solution Engineer with 5+ years of experience building end-to-end 
 
 ELEVATOR PITCH
 ==============
-I'm Rayansh Srivastava, an AI/ML engineer passionate about building intelligent systems that solve real problems. Over the past 5+ years, I've worked with startups across 3 continents, developing everything from multi-agent RAG systems at Saturnin to proprietary video generation engines at Playback. I specialize in LangChain, LangGraph, and production ML systems, and I've led teams across multiple time zones. I'm driven by the challenge of translating complex business needs into elegant AI solutions that deliver measurable value. Whether it's building 20+ autonomous agents or achieving 99.9% uptime on production systems, I focus on quality, scalability, and real-world impact.
+I'm Rayansh Srivastava, an AI/ML engineer passionate about building intelligent systems that solve real problems. Over the past 5+ years, I've worked with startups across 3 continents, developing everything from multi-agent RAG systems at AI Investment and Monitoring Platform to proprietary video generation engines at Playback. I specialize in LangChain, LangGraph, and production ML systems, and I've led teams across multiple time zones. I'm driven by the challenge of translating complex business needs into elegant AI solutions that deliver measurable value. Whether it's building 20+ autonomous agents or achieving 99.9% uptime on production systems, I focus on quality, scalability, and real-world impact.

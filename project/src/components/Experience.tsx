@@ -4,7 +4,7 @@ export default function Experience() {
   const experiences = [
     {
       title: "Founding AI Engineer",
-      company: "Saturnin",
+      company: "Investment Platform",
       location: "Remote",
       period: "Nov 2025 – Jan 2026",
       achievements: [
@@ -34,7 +34,7 @@ export default function Experience() {
     },
     {
       title: "Founding AI Engineer",
-      company: "Saturnin",
+      company: "Investment Platform",
       location: "Remote",
       period: "Nov 2025 – Jan 2026",
       achievements: [

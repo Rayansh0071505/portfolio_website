@@ -227,7 +227,7 @@ Timeline: 5+ Years
 Startups Across 3 Continents (Remote & Hybrid)
 
 Recent Companies:
-1. Saturnin (Nov 2025 - Jan 2026)
+1. AI Investment and Monitoring Platform (Nov 2025 - Jan 2026)
    - Founding AI Engineer
    - Multi-agent RAG system for investor intelligence
 

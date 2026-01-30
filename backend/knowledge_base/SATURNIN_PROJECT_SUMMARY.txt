@@ -1,15 +1,14 @@
 ===============================================
-SATURNIN - PROJECT SUMMARY
+AI INVESTMENT AND MONITORING PLATFORM - PROJECT SUMMARY
 ===============================================
 
 PROJECT PERIOD: November 2025 - January 2026
 ROLE: Founding AI Engineer
-WEBSITE: https://www.saturnin.io/
 
 
-WHAT IS SATURNIN?
+WHAT IS AI INVESTMENT AND MONITORING PLATFORM?
 -----------------
-Saturnin is an AI-powered investor intelligence platform for venture capital firms,
+AI Investment and Monitoring Platform is an AI-powered investor intelligence platform for venture capital firms,
 private equity firms, and institutional investors. It provides highly intelligent
 automated reports to analyze and monitor portfolio companies end-to-end using AI.
 
