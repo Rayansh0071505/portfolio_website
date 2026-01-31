@@ -117,3 +117,20 @@ output "parameter_store_path" {
   description = "Path for environment variables in Parameter Store"
   value       = "/${var.project_name}/env"
 }
+
+# ElastiCache Redis outputs
+output "redis_endpoint" {
+  description = "ElastiCache Redis endpoint for semantic caching"
+  value       = var.redis_enabled ? aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].address : null
+}
+
+output "redis_port" {
+  description = "ElastiCache Redis port"
+  value       = var.redis_enabled ? aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].port : null
+}
+
+output "redis_connection_string" {
+  description = "Full Redis connection string for LangChain"
+  value       = var.redis_enabled ? "redis://${aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].address}:${aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].port}" : null
+  sensitive   = false
+}

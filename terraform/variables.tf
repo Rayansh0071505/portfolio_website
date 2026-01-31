@@ -110,3 +110,16 @@ variable "cloudfront_secret" {
   type        = string
   sensitive   = true
 }
+
+# ElastiCache Configuration
+variable "redis_node_type" {
+  description = "ElastiCache Redis node type (free tier: cache.t3.micro, cache.t4g.micro)"
+  type        = string
+  default     = "cache.t4g.micro"  # 0.5 GiB RAM, ARM-based (cheaper), good for caching
+}
+
+variable "redis_enabled" {
+  description = "Enable ElastiCache Redis for semantic caching"
+  type        = bool
+  default     = true
+}

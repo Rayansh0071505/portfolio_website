@@ -7,6 +7,7 @@ PROJECT_NAME="${PROJECT_NAME}"
 DOCKER_IMAGE="${DOCKER_IMAGE}"
 BACKEND_PORT="${BACKEND_PORT}"
 CLOUDFRONT_SECRET="${CLOUDFRONT_SECRET}"
+REDIS_CACHE_URL="${REDIS_CACHE_URL}"
 
 # Logging
 echo "Starting EC2 instance setup at $(date)" | tee -a /var/log/backend-setup.log
@@ -96,6 +97,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - REDIS_URL=redis://redis:6379
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL}
       - CLOUDFRONT_SECRET=${CLOUDFRONT_SECRET}
       - AWS_REGION=${AWS_REGION}
     depends_on:

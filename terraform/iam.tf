@@ -124,6 +124,27 @@ resource "aws_iam_role_policy" "backend_logs" {
   })
 }
 
+# Policy for ElastiCache access (for semantic caching)
+resource "aws_iam_role_policy" "backend_elasticache" {
+  name_prefix = "${var.project_name}-elasticache-"
+  role        = aws_iam_role.backend_instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticache:DescribeCacheClusters",
+          "elasticache:DescribeReplicationGroups",
+          "elasticache:DescribeCacheSubnetGroups"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Data sources
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}

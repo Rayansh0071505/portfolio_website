@@ -47,6 +47,7 @@ resource "aws_instance" "backend" {
     DOCKER_IMAGE         = var.docker_image
     BACKEND_PORT         = var.backend_port
     CLOUDFRONT_SECRET    = var.cloudfront_secret
+    REDIS_CACHE_URL      = var.redis_enabled ? "redis://${aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].address}:${aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].port}" : ""
   }))
 
   monitoring              = true

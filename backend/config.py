@@ -141,6 +141,17 @@ def get_cloudfront_secret() -> str:
     return config.get_secret("CLOUDFRONT_SECRET")
 
 
+def get_redis_cache_url() -> str:
+    """Get ElastiCache Redis URL for semantic caching"""
+    # Try environment variable first (set by Terraform)
+    redis_url = os.getenv("REDIS_CACHE_URL")
+    if redis_url:
+        return redis_url
+
+    # Fallback to Parameter Store
+    return config.get_secret("REDIS_CACHE_URL", "redis://localhost:6379")
+
+
 # For backward compatibility with existing code
 def get_secret(key: str, default: Optional[str] = None) -> str:
     """Get any secret by key"""

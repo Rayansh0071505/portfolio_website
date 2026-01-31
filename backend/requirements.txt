@@ -7,7 +7,7 @@ boto3  # AWS SDK for Parameter Store
 
 # LangChain & LangGraph
 langchain
-langchain-community
+langchain-community  # Includes RedisSemanticCache
 langchain-core
 langchain-pinecone
 langchain-groq

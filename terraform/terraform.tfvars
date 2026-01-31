@@ -1,0 +1,17 @@
+﻿aws_region  = "us-east-1"
+environment = "production"
+project_name = "rayansh_portfolio"
+instance_type = "m7i-flex.large"
+key_pair_name = "demo"
+instance_root_volume_size = 30
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidr = "10.0.1.0/24"
+private_subnet_cidr = "10.0.2.0/24"
+bucket_prefix = "rayansh-portfolio"
+enable_versioning = true
+cloudfront_enabled = true
+custom_domain = ""
+backend_port = 8080
+docker_image = "444059582963.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest"
+cloudfront_secret = "97f32a248b9cab647c76a2628b95a693d2b34b2159ffba3d40afbb62c37db5"
+allowed_origins = []
