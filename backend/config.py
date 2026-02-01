@@ -142,14 +142,33 @@ def get_cloudfront_secret() -> str:
 
 
 def get_redis_cache_url() -> str:
-    """Get ElastiCache Redis URL for semantic caching"""
-    # Try environment variable first (set by Terraform)
+    """
+    Get ElastiCache Valkey URL for semantic caching
+
+    Priority:
+    1. Environment variable (for local dev)
+    2. AWS Parameter Store (for production - auto-updated by Terraform)
+    3. Fallback to localhost
+    """
+    # Try environment variable first (local dev)
     redis_url = os.getenv("REDIS_CACHE_URL")
-    if redis_url:
+    if redis_url and redis_url != "redis://localhost:6379":
+        logger.info(f"✅ Using REDIS_CACHE_URL from environment variable")
         return redis_url
 
-    # Fallback to Parameter Store
-    return config.get_secret("REDIS_CACHE_URL", "redis://localhost:6379")
+    # In production, read from Parameter Store (auto-updated by Terraform!)
+    if IS_PRODUCTION:
+        try:
+            param_value = config.get_parameter("/personal_portfolio/redis_cache_url", decrypt=False)
+            if param_value:
+                logger.info(f"✅ Using REDIS_CACHE_URL from Parameter Store (auto-updated by Terraform)")
+                return param_value
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to get REDIS_CACHE_URL from Parameter Store: {e}")
+
+    # Fallback to localhost (development)
+    logger.info(f"ℹ️ Using localhost Redis (development fallback)")
+    return "redis://localhost:6379"
 
 
 # For backward compatibility with existing code
