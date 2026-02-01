@@ -22,8 +22,8 @@ from pinecone import Pinecone
 import os
 from dotenv import load_dotenv
 from config import get_groq_api_key, get_google_key, get_pinecone_api_key
-from cache_service import get_semantic_cache
-from langchain_core.globals import set_llm_cache
+# Valkey cache auto-initializes on import
+import cache_service
 
 load_dotenv()
 
@@ -165,37 +165,8 @@ def get_backup_llm():
     return _backup_llm
 
 
-def init_semantic_cache():
-    """
-    Initialize LangChain's global semantic cache with Redis
-    This caches LLM responses based on semantic similarity of prompts
-
-    Uses langchain_community.cache.RedisSemanticCache:
-    - Shared across ALL users (max cost savings)
-    - 80% similarity threshold (0.2 distance)
-    - Auto-eviction based on Redis LRU policy
-    """
-    global _semantic_cache_enabled
-
-    if _semantic_cache_enabled:
-        return
-
-    try:
-        logger.info("🔄 Initializing semantic cache...")
-        cache = get_semantic_cache()  # Get global cache
-
-        if cache:
-            # Set as global LangChain cache (applies to ALL LLM calls automatically)
-            set_llm_cache(cache)
-            _semantic_cache_enabled = True
-            logger.info("✅ Semantic cache enabled globally (80% similarity threshold)")
-            logger.info("💡 Cache will save API costs on repeated/similar questions")
-        else:
-            logger.warning("⚠️ Semantic cache not available - running without caching")
-
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize semantic cache: {e}")
-        logger.info("ℹ️ Continuing without semantic caching")
+# Valkey cache auto-initializes on module import (see cache_service.py)
+# No need for manual initialization anymore
 
 
 # ============================================================================
@@ -492,9 +463,7 @@ class RayanshAI:
     async def initialize(self):
         """Initialize agent and pre-load embeddings model (call once at startup)"""
         try:
-            # Initialize semantic cache FIRST (before creating agent)
-            init_semantic_cache()
-
+            # Valkey cache auto-initializes on module import
             self.agent, self.checkpointer = await create_rayansh_agent(use_backup=self.use_backup)
             logger.info("✅ Rayansh AI Agent initialized with MemorySaver persistence")
 
