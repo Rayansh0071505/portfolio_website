@@ -22,8 +22,9 @@ from pinecone import Pinecone
 import os
 from dotenv import load_dotenv
 from config import get_groq_api_key, get_google_key, get_pinecone_api_key
-# Valkey cache auto-initializes on import
-import cache_service
+# Valkey cache integration
+from cache_service import get_valkey_cache
+from langchain_core.globals import set_llm_cache
 
 load_dotenv()
 
@@ -165,8 +166,22 @@ def get_backup_llm():
     return _backup_llm
 
 
-# Valkey cache auto-initializes on module import (see cache_service.py)
-# No need for manual initialization anymore
+def init_valkey_cache():
+    """
+    Initialize Valkey cache and set as global LangChain cache
+    This enables automatic caching for ALL LLM calls
+    """
+    try:
+        cache = get_valkey_cache()
+        if cache:
+            set_llm_cache(cache)
+            logger.info("✅ Valkey cache enabled globally for LLM calls")
+            logger.info("💡 LLM responses cached PERMANENTLY (never expire)")
+        else:
+            logger.info("ℹ️ Valkey cache not available - running without caching")
+    except Exception as e:
+        logger.error(f"❌ Failed to enable Valkey cache: {e}")
+        logger.info("ℹ️ Continuing without caching")
 
 
 # ============================================================================
@@ -463,7 +478,9 @@ class RayanshAI:
     async def initialize(self):
         """Initialize agent and pre-load embeddings model (call once at startup)"""
         try:
-            # Valkey cache auto-initializes on module import
+            # Initialize Valkey cache FIRST (before creating agent)
+            init_valkey_cache()
+
             self.agent, self.checkpointer = await create_rayansh_agent(use_backup=self.use_backup)
             logger.info("✅ Rayansh AI Agent initialized with MemorySaver persistence")
 

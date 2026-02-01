@@ -166,15 +166,16 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
         return None
 
 
-def update_cache(prompt: str, llm_string: str, response: str, ttl: int = 86400):
+def update_cache(prompt: str, llm_string: str, response: str):
     """
-    Save LLM response to cache
+    Save LLM response to cache PERMANENTLY (no expiration)
 
     Args:
         prompt: The input prompt
         llm_string: LLM identifier string
         response: The LLM response to cache
-        ttl: Time to live in seconds (default: 24 hours)
+
+    Note: Cache entries never expire - only removed via manual clear
     """
     if not _cache_enabled:
         return
@@ -184,14 +185,14 @@ def update_cache(prompt: str, llm_string: str, response: str, ttl: int = 86400):
         if not client:
             return
 
-        logger.info(f"💾 SAVING TO CACHE: Storing LLM response (prompt length: {len(prompt)} chars)")
+        logger.info(f"💾 SAVING TO CACHE: Storing LLM response permanently (prompt length: {len(prompt)} chars)")
 
         cache_key = cache_key_for_query(f"{llm_string}:{prompt}")
 
-        # Store response with TTL
-        client.setex(cache_key, ttl, response.encode('utf-8'))
+        # Store response PERMANENTLY (no TTL)
+        client.set(cache_key, response.encode('utf-8'))
 
-        logger.info(f"✅ CACHED SUCCESSFULLY: Response saved with {ttl}s TTL")
+        logger.info(f"✅ CACHED PERMANENTLY: Response saved (never expires)")
 
     except Exception as e:
         logger.error(f"⚠️ Cache update error: {e}")
@@ -199,18 +200,90 @@ def update_cache(prompt: str, llm_string: str, response: str, ttl: int = 86400):
 
 def clear_cache():
     """
-    Clear all cached entries (use with caution)
+    Clear all cached LLM responses
+
+    WARNING: This deletes ALL cache keys. Use carefully!
     """
     try:
         client = get_valkey_client()
-        if client:
-            # Get all cache keys and delete
-            # This is a simple implementation - in production, use key patterns
-            logger.info(f"⚠️ Cache clear requested")
-            # Note: FLUSHDB is dangerous in production, implement pattern-based deletion
-            logger.info(f"ℹ️ Cache entries will auto-expire based on TTL")
+        if not client:
+            logger.warning("⚠️ Cache not available")
+            return
+
+        logger.warning(f"⚠️ CLEARING ALL CACHE: Deleting all cached responses...")
+
+        # Flush all keys (DANGEROUS in production if sharing Valkey!)
+        # For production, implement pattern-based deletion
+        client.flushdb()
+
+        logger.info(f"✅ Cache cleared successfully")
+
     except Exception as e:
         logger.error(f"❌ Failed to clear cache: {e}")
+
+
+# LangChain-compatible cache class
+class ValkeyCache:
+    """
+    LangChain-compatible cache using Valkey for exact-match caching
+    Can be used with set_llm_cache() to enable global caching
+    """
+
+    def lookup(self, prompt: str, llm_string: str):
+        """
+        LangChain cache interface: lookup cached response
+
+        Args:
+            prompt: The input prompt
+            llm_string: LLM identifier string
+
+        Returns:
+            List of Generation objects if cache hit, None otherwise
+        """
+        try:
+            from langchain_core.outputs import Generation
+
+            cached_text = lookup_cache(prompt, llm_string)
+            if cached_text:
+                # Return as LangChain Generation object
+                return [Generation(text=cached_text)]
+            return None
+        except Exception as e:
+            logger.error(f"⚠️ Cache lookup error: {e}")
+            return None
+
+    def update(self, prompt: str, llm_string: str, return_val):
+        """
+        LangChain cache interface: store response in cache
+
+        Args:
+            prompt: The input prompt
+            llm_string: LLM identifier string
+            return_val: List of Generation objects from LLM
+        """
+        try:
+            if return_val and len(return_val) > 0:
+                # Extract text from first Generation object
+                response_text = return_val[0].text
+                update_cache(prompt, llm_string, response_text)
+        except Exception as e:
+            logger.error(f"⚠️ Cache update error: {e}")
+
+    def clear(self, **kwargs):
+        """LangChain cache interface: clear cache"""
+        clear_cache()
+
+
+def get_valkey_cache():
+    """
+    Get LangChain-compatible Valkey cache instance
+
+    Returns:
+        ValkeyCache instance if available, None otherwise
+    """
+    if _cache_enabled and get_valkey_client():
+        return ValkeyCache()
+    return None
 
 
 # Initialize cache on module import
@@ -219,8 +292,9 @@ def init_cache():
     try:
         client = get_valkey_client()
         if client:
-            logger.info("✅ Semantic cache initialized with Valkey")
+            logger.info("✅ Semantic cache initialized with Valkey (PERMANENT storage)")
             logger.info("💡 Watch logs for: '✅ CACHE HIT' (saved $$$) or '❌ CACHE MISS' (new query)")
+            logger.info("💡 Cache entries never expire - manually clear if needed")
         else:
             logger.info("ℹ️ Semantic cache not available - running without caching")
     except Exception as e:
