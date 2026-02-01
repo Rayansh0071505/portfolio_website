@@ -95,19 +95,30 @@ def get_semantic_cache() -> Optional[RedisSemanticCache]:
         embeddings = get_cache_embeddings()
 
         if _semantic_cache is None:
-            # Create global cache instance with logging
-            cache = LoggingRedisSemanticCache(
-                redis_url=redis_url,
-                embedding=embeddings,
-                score_threshold=0.2  # Distance threshold (lower = more strict)
-                                     # 0.2 means ~80% similarity required for cache hit
-                                     # Range: 0.1 (very strict) to 0.5 (loose)
-            )
+            try:
+                # Create global cache instance with logging
+                cache = LoggingRedisSemanticCache(
+                    redis_url=redis_url,
+                    embedding=embeddings,
+                    score_threshold=0.2  # Distance threshold (lower = more strict)
+                                         # 0.2 means ~80% similarity required for cache hit
+                                         # Range: 0.1 (very strict) to 0.5 (loose)
+                )
 
-            # Store global cache
-            _semantic_cache = cache
-            logger.info(f"✅ Semantic cache initialized globally with LOGGING (threshold: 0.2)")
-            logger.info(f"💡 Watch logs for: '✅ CACHE HIT' (saved $$$) or '❌ CACHE MISS' (new query)")
+                # Store global cache
+                _semantic_cache = cache
+                logger.info(f"✅ Semantic cache initialized globally with LOGGING (threshold: 0.2)")
+                logger.info(f"💡 Watch logs for: '✅ CACHE HIT' (saved $$$) or '❌ CACHE MISS' (new query)")
+            except Exception as cache_error:
+                # Gracefully handle Redis without required modules
+                if "unknown command 'MODULE'" in str(cache_error) or "MODULE" in str(cache_error):
+                    logger.warning(f"⚠️ Redis doesn't support required modules (RedisJSON/RediSearch)")
+                    logger.warning(f"⚠️ ElastiCache Redis needs Redis Stack for semantic caching")
+                    logger.info(f"ℹ️ Semantic caching disabled - LLM will run without cache")
+                else:
+                    logger.error(f"❌ Failed to initialize semantic cache: {cache_error}")
+                    logger.info(f"ℹ️ Continuing without semantic caching")
+                return None
 
         return _semantic_cache
 
