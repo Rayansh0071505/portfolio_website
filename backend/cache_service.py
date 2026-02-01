@@ -273,6 +273,19 @@ class ValkeyCache:
         """LangChain cache interface: clear cache"""
         clear_cache()
 
+    # Async methods for LangChain async LLM calls
+    async def alookup(self, prompt: str, llm_string: str):
+        """Async version of lookup"""
+        return self.lookup(prompt, llm_string)
+
+    async def aupdate(self, prompt: str, llm_string: str, return_val):
+        """Async version of update"""
+        self.update(prompt, llm_string, return_val)
+
+    async def aclear(self, **kwargs):
+        """Async version of clear"""
+        clear_cache()
+
 
 def get_valkey_cache():
     """
