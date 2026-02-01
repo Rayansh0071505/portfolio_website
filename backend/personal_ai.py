@@ -573,7 +573,11 @@ class RayanshAI:
                 logger.error(f"❌ TRIMMING FAILED: {e}")
 
             # Run agent (async with ainvoke - modern pattern)
+            logger.info(f"🚀 Invoking LLM for session {session_id}...")
+            llm_start_time = time.time()
             response = await self.agent.ainvoke(input_data, config)
+            llm_elapsed = time.time() - llm_start_time
+            logger.info(f"⚡ LLM response received in {llm_elapsed:.2f}s (cache hit if <1s)")
 
             # Extract AI message from response
             assistant_text = None

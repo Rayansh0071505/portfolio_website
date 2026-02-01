@@ -4,12 +4,45 @@ Automatically caches LLM responses based on semantic similarity
 """
 import os
 import logging
-from typing import Optional
+from typing import Optional, List, Any
 from langchain_community.cache import RedisSemanticCache
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.caches import RETURN_VAL_TYPE
+from langchain_core.outputs import Generation
 from config import get_redis_cache_url
 
 logger = logging.getLogger(__name__)
+
+
+class LoggingRedisSemanticCache(RedisSemanticCache):
+    """
+    Custom RedisSemanticCache with detailed logging for cache hits/misses
+    """
+
+    def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE:
+        """
+        Override lookup to log cache hits/misses
+        """
+        logger.info(f"🔍 CACHE LOOKUP: Searching for similar prompt (length: {len(prompt)} chars)")
+
+        result = super().lookup(prompt, llm_string)
+
+        if result:
+            logger.info(f"✅ CACHE HIT! Found cached response, saving API costs 💰")
+        else:
+            logger.info(f"❌ CACHE MISS: No similar prompt found, will query LLM and cache response")
+
+        return result
+
+    def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
+        """
+        Override update to log when responses are saved to cache
+        """
+        logger.info(f"💾 SAVING TO CACHE: Storing LLM response for future reuse (prompt length: {len(prompt)} chars)")
+
+        super().update(prompt, llm_string, return_val)
+
+        logger.info(f"✅ CACHED SUCCESSFULLY: Response saved to Redis with semantic embeddings")
 
 # Global cache instance (lazy initialization)
 _semantic_cache = None
@@ -62,8 +95,8 @@ def get_semantic_cache() -> Optional[RedisSemanticCache]:
         embeddings = get_cache_embeddings()
 
         if _semantic_cache is None:
-            # Create global cache instance
-            cache = RedisSemanticCache(
+            # Create global cache instance with logging
+            cache = LoggingRedisSemanticCache(
                 redis_url=redis_url,
                 embedding=embeddings,
                 score_threshold=0.2  # Distance threshold (lower = more strict)
@@ -73,7 +106,8 @@ def get_semantic_cache() -> Optional[RedisSemanticCache]:
 
             # Store global cache
             _semantic_cache = cache
-            logger.info(f"✅ Semantic cache initialized globally (threshold: 0.2)")
+            logger.info(f"✅ Semantic cache initialized globally with LOGGING (threshold: 0.2)")
+            logger.info(f"💡 Watch logs for: '✅ CACHE HIT' (saved $$$) or '❌ CACHE MISS' (new query)")
 
         return _semantic_cache
 
