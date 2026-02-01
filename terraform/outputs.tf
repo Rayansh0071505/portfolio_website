@@ -118,19 +118,19 @@ output "parameter_store_path" {
   value       = "/${var.project_name}/env"
 }
 
-# ElastiCache Redis outputs
+# ElastiCache Valkey outputs
 output "redis_endpoint" {
-  description = "ElastiCache Redis endpoint for semantic caching"
-  value       = var.redis_enabled ? aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].address : null
+  description = "ElastiCache Valkey endpoint for semantic caching"
+  value       = var.redis_enabled ? aws_elasticache_replication_group.semantic_cache[0].primary_endpoint_address : null
 }
 
 output "redis_port" {
-  description = "ElastiCache Redis port"
-  value       = var.redis_enabled ? aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].port : null
+  description = "ElastiCache Valkey port"
+  value       = var.redis_enabled ? aws_elasticache_replication_group.semantic_cache[0].port : null
 }
 
 output "redis_connection_string" {
-  description = "Full Redis connection string for LangChain"
-  value       = var.redis_enabled ? "redis://${aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].address}:${aws_elasticache_cluster.semantic_cache[0].cache_nodes[0].port}" : null
+  description = "Full Valkey connection string for LangChain"
+  value       = var.redis_enabled ? "redis://${aws_elasticache_replication_group.semantic_cache[0].primary_endpoint_address}:${aws_elasticache_replication_group.semantic_cache[0].port}" : null
   sensitive   = false
 }

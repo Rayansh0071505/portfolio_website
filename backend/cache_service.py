@@ -86,15 +86,19 @@ def get_valkey_client():
             socket_connect_timeout=5,
         )
 
-        # Test connection
-        client.ping()
-
-        _valkey_client = client
-        _cache_enabled = True
-        logger.info(f"✅ Valkey client connected to {host}:{port}")
-        logger.info(f"💡 Semantic cache ready - will save API costs on similar questions")
-
-        return _valkey_client
+        # Test connection with timeout
+        try:
+            client.ping()
+            _valkey_client = client
+            _cache_enabled = True
+            logger.info(f"✅ Valkey client connected to {host}:{port}")
+            logger.info(f"💡 Semantic cache ready - will save API costs on similar questions")
+            return _valkey_client
+        except Exception as ping_error:
+            logger.warning(f"⚠️ Cannot connect to Valkey at {host}:{port}: {ping_error}")
+            logger.info("ℹ️ ElastiCache may be unreachable from EC2 - check VPC/security groups")
+            _cache_enabled = False
+            return None
 
     except Exception as e:
         logger.error(f"❌ Failed to initialize Valkey client: {e}")
