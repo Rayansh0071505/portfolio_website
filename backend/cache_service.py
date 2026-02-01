@@ -132,32 +132,54 @@ def extract_user_question(prompt: str) -> str:
         Just the user's latest question
     """
     try:
-        # LangChain prompt format: [HumanMessage, AIMessage, HumanMessage, ...]
-        # We want the LAST HumanMessage content
+        import re
 
-        # Simple extraction: find last "HumanMessage" or user input
-        # This is a heuristic - might need adjustment based on actual format
+        # DEBUG: Log first 500 chars of prompt to understand format
+        logger.info(f"🔍 DEBUG: Prompt preview (first 500 chars): {prompt[:500]}")
+
+        # Try multiple extraction patterns
+
+        # Pattern 1: Look for content="..." or content='...'
+        matches = re.findall(r'content=["\']([^"\']+)["\']', prompt)
+        if matches:
+            # Get the last match (most recent user message)
+            last_question = matches[-1]
+            logger.info(f"✅ Extracted via pattern 1: '{last_question[:100]}'")
+            return last_question
+
+        # Pattern 2: Look for HumanMessage with content
         if "HumanMessage" in prompt:
-            # Extract content after last HumanMessage
             parts = prompt.split("HumanMessage")
             if len(parts) > 1:
                 last_human = parts[-1]
-                # Extract content between quotes or parentheses
-                import re
-                match = re.search(r'content=["\'](.+?)["\']', last_human)
+                # Try to extract content
+                match = re.search(r'content=["\'](.+?)["\']', last_human, re.DOTALL)
                 if match:
-                    return match.group(1)
+                    question = match.group(1)
+                    logger.info(f"✅ Extracted via pattern 2: '{question[:100]}'")
+                    return question
 
-        # Fallback: use last 500 chars (usually contains the question)
-        return prompt[-500:]
+        # Pattern 3: Look for "input": "..." pattern
+        match = re.search(r'"input"\s*:\s*"([^"]+)"', prompt)
+        if match:
+            question = match.group(1)
+            logger.info(f"✅ Extracted via pattern 3: '{question[:100]}'")
+            return question
+
+        # Fallback: Log warning and use full prompt (will fail should_cache filter)
+        logger.warning(f"⚠️ Could not extract user question from prompt, using full prompt")
+        logger.info(f"🔍 Full prompt (first 1000 chars): {prompt[:1000]}")
+        return prompt
+
     except Exception as e:
-        logger.warning(f"⚠️ Failed to extract user question, using full prompt: {e}")
+        logger.warning(f"⚠️ Failed to extract user question: {e}")
+        logger.info(f"🔍 Prompt that failed: {prompt[:500]}")
         return prompt
 
 
 def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.85) -> Optional[str]:
     """
-    Lookup cached LLM response for user questions
+    Lookup cached LLM response using SEMANTIC SIMILARITY search
     Caches based on USER QUESTION only (ignores conversation history)
 
     Args:
@@ -179,22 +201,65 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
         # Extract ONLY the user's question (ignore history)
         user_question = extract_user_question(prompt)
 
-        logger.info(f"🔍 CACHE LOOKUP: Searching for question (length: {len(user_question)} chars)")
+        logger.info(f"🔍 SEMANTIC SEARCH: Looking for similar questions (query length: {len(user_question)} chars)")
 
-        # Cache key based on user question ONLY (not full prompt!)
-        cache_key = cache_key_for_query(f"{llm_string}:{user_question}")
+        # Generate embedding for the user's question
+        embeddings_model = get_cache_embeddings()
+        query_embedding = embeddings_model.embed_query(user_question)
 
-        # Try exact match
-        cached = client.get(cache_key)
-        if cached:
-            logger.info(f"✅ CACHE HIT! Found cached response, saving API costs 💰")
-            return cached.decode('utf-8')
+        logger.info(f"🧮 Generated embedding vector (384-dim) for semantic search")
 
-        logger.info(f"❌ CACHE MISS: No cached response found, will query LLM")
+        # Search for similar cached questions using embeddings
+        # Get all cache keys and compute similarity
+        import numpy as np
+
+        best_match = None
+        best_similarity = 0.0
+
+        # Pattern to match cache keys for this LLM
+        pattern = f"{llm_string}:*"
+
+        # Scan all keys (use SCAN for production to avoid blocking)
+        for key in client.scan_iter(match=pattern, count=100):
+            try:
+                # Get stored embedding for this key
+                embedding_key = key.decode('utf-8') + ":embedding"
+                stored_embedding_bytes = client.get(embedding_key)
+
+                if stored_embedding_bytes:
+                    # Deserialize embedding
+                    stored_embedding = json.loads(stored_embedding_bytes.decode('utf-8'))
+
+                    # Compute cosine similarity
+                    similarity = np.dot(query_embedding, stored_embedding) / (
+                        np.linalg.norm(query_embedding) * np.linalg.norm(stored_embedding)
+                    )
+
+                    if similarity > best_similarity:
+                        best_similarity = similarity
+                        best_match = key
+
+            except Exception as e:
+                logger.warning(f"⚠️ Error processing key {key}: {e}")
+                continue
+
+        # Check if we found a match above threshold
+        if best_match and best_similarity >= similarity_threshold:
+            cached_response = client.get(best_match)
+            if cached_response:
+                logger.info(f"✅ SEMANTIC CACHE HIT! Similarity: {best_similarity:.2%} (threshold: {similarity_threshold:.0%}) 💰")
+                logger.info(f"📊 Matched cached question, saving API costs!")
+                return cached_response.decode('utf-8')
+
+        if best_match:
+            logger.info(f"❌ SEMANTIC CACHE MISS: Best similarity {best_similarity:.2%} < threshold {similarity_threshold:.0%}")
+        else:
+            logger.info(f"❌ SEMANTIC CACHE MISS: No cached questions found")
+
         return None
 
     except Exception as e:
-        logger.error(f"⚠️ Cache lookup error: {e}")
+        logger.error(f"⚠️ Semantic cache lookup error: {e}")
         return None
 
 
@@ -265,15 +330,26 @@ def update_cache(prompt: str, llm_string: str, response: str):
         if not should_cache(user_question):
             return
 
-        logger.info(f"💾 SAVING TO CACHE: Question → Response (question length: {len(user_question)} chars)")
+        logger.info(f"💾 SAVING TO SEMANTIC CACHE: Question → Response (question length: {len(user_question)} chars)")
 
         # Cache key based on user question ONLY (not full prompt!)
         cache_key = cache_key_for_query(f"{llm_string}:{user_question}")
 
+        # Generate embedding for semantic search
+        embeddings_model = get_cache_embeddings()
+        question_embedding = embeddings_model.embed_query(user_question)
+
+        logger.info(f"🧮 Generated 384-dim embedding vector for semantic search")
+
         # Store response PERMANENTLY (no TTL)
         client.set(cache_key, response.encode('utf-8'))
 
-        logger.info(f"✅ CACHED PERMANENTLY: '{user_question[:50]}...' → Response saved (never expires)")
+        # Store embedding for semantic similarity search (as JSON)
+        embedding_key = cache_key + ":embedding"
+        client.set(embedding_key, json.dumps(question_embedding).encode('utf-8'))
+
+        logger.info(f"✅ SEMANTIC CACHE SAVED: '{user_question[:50]}...' → Response + Embedding (never expires)")
+        logger.info(f"🔍 Future similar questions will match via semantic search (>85% similarity)")
 
     except Exception as e:
         logger.error(f"⚠️ Cache update error: {e}")
