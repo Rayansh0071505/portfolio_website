@@ -120,12 +120,48 @@ def cache_key_for_query(query: str) -> str:
     return md5(query.encode("utf-8")).hexdigest()
 
 
-def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.85) -> Optional[str]:
+def extract_user_question(prompt: str) -> str:
     """
-    Lookup cached LLM response for similar prompts
+    Extract just the user's question from the full LangChain prompt
+    Ignores system instructions and conversation history
 
     Args:
-        prompt: The input prompt
+        prompt: Full LangChain prompt (system + history + question)
+
+    Returns:
+        Just the user's latest question
+    """
+    try:
+        # LangChain prompt format: [HumanMessage, AIMessage, HumanMessage, ...]
+        # We want the LAST HumanMessage content
+
+        # Simple extraction: find last "HumanMessage" or user input
+        # This is a heuristic - might need adjustment based on actual format
+        if "HumanMessage" in prompt:
+            # Extract content after last HumanMessage
+            parts = prompt.split("HumanMessage")
+            if len(parts) > 1:
+                last_human = parts[-1]
+                # Extract content between quotes or parentheses
+                import re
+                match = re.search(r'content=["\'](.+?)["\']', last_human)
+                if match:
+                    return match.group(1)
+
+        # Fallback: use last 500 chars (usually contains the question)
+        return prompt[-500:]
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to extract user question, using full prompt: {e}")
+        return prompt
+
+
+def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.85) -> Optional[str]:
+    """
+    Lookup cached LLM response for user questions
+    Caches based on USER QUESTION only (ignores conversation history)
+
+    Args:
+        prompt: The full LangChain prompt (system + history + question)
         llm_string: LLM identifier string
         similarity_threshold: Minimum cosine similarity (0-1) to consider a cache hit
 
@@ -140,25 +176,21 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
         if not client:
             return None
 
-        embeddings = get_cache_embeddings()
+        # Extract ONLY the user's question (ignore history)
+        user_question = extract_user_question(prompt)
 
-        # Generate embedding for the prompt
-        logger.info(f"🔍 CACHE LOOKUP: Searching for similar prompt (length: {len(prompt)} chars)")
+        logger.info(f"🔍 CACHE LOOKUP: Searching for question (length: {len(user_question)} chars)")
 
-        prompt_embedding = embeddings.embed_query(prompt)
-        cache_key = cache_key_for_query(f"{llm_string}:{prompt}")
+        # Cache key based on user question ONLY (not full prompt!)
+        cache_key = cache_key_for_query(f"{llm_string}:{user_question}")
 
-        # Try exact match first (fastest)
+        # Try exact match
         cached = client.get(cache_key)
         if cached:
-            logger.info(f"✅ CACHE HIT! Found exact match, saving API costs 💰")
+            logger.info(f"✅ CACHE HIT! Found cached response, saving API costs 💰")
             return cached.decode('utf-8')
 
-        # Note: Vector similarity search requires Valkey 8.2+ with valkey-search module
-        # For now, we'll rely on exact matches until vector search is properly configured
-        # TODO: Implement vector similarity search with FT.SEARCH once index is created
-
-        logger.info(f"❌ CACHE MISS: No match found, will query LLM and cache response")
+        logger.info(f"❌ CACHE MISS: No cached response found, will query LLM")
         return None
 
     except Exception as e:
@@ -166,12 +198,53 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
         return None
 
 
+def should_cache(user_question: str) -> bool:
+    """
+    Determine if a user question should be cached
+
+    Filters out:
+    - Very short responses (likely names or personal info)
+    - Personal information patterns
+
+    Args:
+        user_question: The extracted user question
+
+    Returns:
+        True if should cache, False otherwise
+    """
+    # Strip whitespace
+    question = user_question.strip()
+
+    # Don't cache very short responses (< 15 chars) - likely names or personal info
+    if len(question) < 15:
+        logger.info(f"⏭️ SKIPPING CACHE: Too short ({len(question)} chars) - likely personal info: '{question}'")
+        return False
+
+    # Don't cache if it looks like a name pattern (no question mark, very short, capitalized words)
+    if len(question) < 30 and '?' not in question:
+        # Check if it's likely a name: "John", "My name is John", "I'm Sarah"
+        name_patterns = [
+            r'^[A-Z][a-z]+$',  # Single capitalized word: "John"
+            r'^My name is ',   # "My name is John"
+            r"^I'm [A-Z]",     # "I'm John"
+            r"^I am [A-Z]",    # "I am John"
+        ]
+        import re
+        for pattern in name_patterns:
+            if re.search(pattern, question):
+                logger.info(f"⏭️ SKIPPING CACHE: Looks like personal info - '{question}'")
+                return False
+
+    return True
+
+
 def update_cache(prompt: str, llm_string: str, response: str):
     """
     Save LLM response to cache PERMANENTLY (no expiration)
+    Caches based on USER QUESTION only (ignores conversation history)
 
     Args:
-        prompt: The input prompt
+        prompt: The full LangChain prompt (system + history + question)
         llm_string: LLM identifier string
         response: The LLM response to cache
 
@@ -185,14 +258,22 @@ def update_cache(prompt: str, llm_string: str, response: str):
         if not client:
             return
 
-        logger.info(f"💾 SAVING TO CACHE: Storing LLM response permanently (prompt length: {len(prompt)} chars)")
+        # Extract ONLY the user's question (ignore history)
+        user_question = extract_user_question(prompt)
 
-        cache_key = cache_key_for_query(f"{llm_string}:{prompt}")
+        # Check if we should cache this question
+        if not should_cache(user_question):
+            return
+
+        logger.info(f"💾 SAVING TO CACHE: Question → Response (question length: {len(user_question)} chars)")
+
+        # Cache key based on user question ONLY (not full prompt!)
+        cache_key = cache_key_for_query(f"{llm_string}:{user_question}")
 
         # Store response PERMANENTLY (no TTL)
         client.set(cache_key, response.encode('utf-8'))
 
-        logger.info(f"✅ CACHED PERMANENTLY: Response saved (never expires)")
+        logger.info(f"✅ CACHED PERMANENTLY: '{user_question[:50]}...' → Response saved (never expires)")
 
     except Exception as e:
         logger.error(f"⚠️ Cache update error: {e}")
