@@ -13,12 +13,12 @@ resource "aws_elasticache_subnet_group" "redis" {
   }
 }
 
-# ElastiCache Redis Cluster
+# ElastiCache Valkey Cluster with Vector Search for Semantic Caching
 resource "aws_elasticache_cluster" "semantic_cache" {
   count = var.redis_enabled ? 1 : 0
   cluster_id           = "${replace(var.project_name, "_", "-")}-cache"
-  engine               = "redis"
-  engine_version       = "7.1"  # Latest stable with RedisJSON + RediSearch support
+  engine               = "valkey"
+  engine_version       = "8.2"  # Valkey 8.2+ with valkey-search for vector similarity
   node_type            = var.redis_node_type
   num_cache_nodes      = 1
   parameter_group_name = aws_elasticache_parameter_group.redis[0].name
@@ -45,12 +45,12 @@ resource "aws_elasticache_cluster" "semantic_cache" {
   }
 }
 
-# Parameter Group for Redis
+# Parameter Group for Valkey with Vector Search
 resource "aws_elasticache_parameter_group" "redis" {
   count = var.redis_enabled ? 1 : 0
 
-  name   = "${replace(var.project_name, "_", "-")}-redis-params"
-  family = "redis7"
+  name   = "${replace(var.project_name, "_", "-")}-valkey-params"
+  family = "valkey8"
 
   # Enable persistence (if needed, but adds cost)
   # For semantic cache, we can disable persistence (cache can rebuild)

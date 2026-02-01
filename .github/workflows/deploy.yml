@@ -216,18 +216,15 @@ jobs:
             IMAGE_NAME="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/rayansh_portfolio:latest"
             echo "✅ Image: ${IMAGE_NAME}"
 
-            # Check if image exists locally
-            if docker image inspect ${IMAGE_NAME} >/dev/null 2>&1; then
-              echo "✅ Image already exists locally"
+            # LOGIN to ECR (required to pull private images)
+            echo "Logging in to ECR..."
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+            echo "✅ ECR login successful"
 
-              # Try to pull latest (but don't fail if it doesn't work)
-              echo "Attempting to pull latest image..."
-              timeout 60 docker pull ${IMAGE_NAME} 2>&1 && echo "✅ Pulled latest image" || echo "⚠️ Using existing image (pull failed)"
-            else
-              echo "❌ Image not found locally and cannot pull (AWS CLI not available)"
-              echo "This is a new instance - need to wait for user_data to complete AWS CLI setup"
-              exit 1
-            fi
+            # Force pull latest image (no fallback to old image)
+            echo "Pulling latest image from ECR..."
+            docker pull ${IMAGE_NAME}
+            echo "✅ Latest image pulled successfully"
 
             # Stop existing container
             docker stop backend_api 2>/dev/null || true
