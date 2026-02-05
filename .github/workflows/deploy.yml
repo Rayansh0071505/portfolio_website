@@ -215,6 +215,24 @@ jobs:
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
             echo "✅ ECR login successful"
 
+            # Check disk space before cleanup
+            echo "💾 Checking disk space..."
+            df -h / | grep -v Filesystem
+            DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+            echo "Current disk usage: ${DISK_USAGE}%"
+
+            # Clean up old Docker images/containers/volumes to prevent disk space issues
+            echo "🧹 Cleaning up old Docker resources..."
+            docker system prune -a -f --volumes || true
+
+            # Show freed space
+            echo "💾 Disk space after cleanup:"
+            df -h / | grep -v Filesystem
+            DISK_USAGE_AFTER=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+            echo "Disk usage after cleanup: ${DISK_USAGE_AFTER}%"
+            FREED=$((DISK_USAGE - DISK_USAGE_AFTER))
+            echo "✅ Freed ${FREED}% disk space"
+
             # Force pull latest image (no fallback to old image)
             echo "Pulling latest image from ECR..."
             docker pull ${IMAGE_NAME}
