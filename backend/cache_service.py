@@ -132,48 +132,49 @@ def extract_user_question(prompt: str) -> str:
         Just the user's latest question
     """
     try:
+        # LangChain sends prompts as JSON array of message objects
+        # Format: [{"lc": 1, "type": "constructor", "id": ["langchain", "schema", "messages", "HumanMessage"], "kwargs": {"content": "question"}}]
+
+        messages = json.loads(prompt)
+
+        if isinstance(messages, list):
+            # Iterate in reverse to find the last HumanMessage
+            for msg in reversed(messages):
+                if isinstance(msg, dict):
+                    # Check if this is a HumanMessage
+                    msg_id = msg.get("id", [])
+                    if isinstance(msg_id, list) and "HumanMessage" in msg_id:
+                        # Extract content from kwargs
+                        kwargs = msg.get("kwargs", {})
+                        content = kwargs.get("content", "")
+                        if content:
+                            logger.info(f"✅ Extracted user question: '{content[:100]}...' (length: {len(content)} chars)")
+                            return content
+
+            logger.warning(f"⚠️ No HumanMessage found in prompt, using full prompt")
+        else:
+            logger.warning(f"⚠️ Prompt is not a list, using full prompt")
+
+        return prompt
+
+    except json.JSONDecodeError:
+        # Prompt is not JSON, try regex patterns
+        logger.info(f"🔍 Prompt is not JSON, trying regex patterns")
+
         import re
-
-        # DEBUG: Log first 500 chars of prompt to understand format
-        logger.info(f"🔍 DEBUG: Prompt preview (first 500 chars): {prompt[:500]}")
-
-        # Try multiple extraction patterns
 
         # Pattern 1: Look for content="..." or content='...'
         matches = re.findall(r'content=["\']([^"\']+)["\']', prompt)
         if matches:
-            # Get the last match (most recent user message)
             last_question = matches[-1]
-            logger.info(f"✅ Extracted via pattern 1: '{last_question[:100]}'")
+            logger.info(f"✅ Extracted via regex: '{last_question[:100]}'")
             return last_question
 
-        # Pattern 2: Look for HumanMessage with content
-        if "HumanMessage" in prompt:
-            parts = prompt.split("HumanMessage")
-            if len(parts) > 1:
-                last_human = parts[-1]
-                # Try to extract content
-                match = re.search(r'content=["\'](.+?)["\']', last_human, re.DOTALL)
-                if match:
-                    question = match.group(1)
-                    logger.info(f"✅ Extracted via pattern 2: '{question[:100]}'")
-                    return question
-
-        # Pattern 3: Look for "input": "..." pattern
-        match = re.search(r'"input"\s*:\s*"([^"]+)"', prompt)
-        if match:
-            question = match.group(1)
-            logger.info(f"✅ Extracted via pattern 3: '{question[:100]}'")
-            return question
-
-        # Fallback: Log warning and use full prompt (will fail should_cache filter)
         logger.warning(f"⚠️ Could not extract user question from prompt, using full prompt")
-        logger.info(f"🔍 Full prompt (first 1000 chars): {prompt[:1000]}")
         return prompt
 
     except Exception as e:
         logger.warning(f"⚠️ Failed to extract user question: {e}")
-        logger.info(f"🔍 Prompt that failed: {prompt[:500]}")
         return prompt
 
 
