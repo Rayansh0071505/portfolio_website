@@ -224,10 +224,16 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
         # Scan all keys (use SCAN for production to avoid blocking)
         keys_found = 0
         for key in client.scan_iter(match=pattern, count=100):
+            key_str = key.decode('utf-8')
+
+            # Skip embedding keys (we only want response keys)
+            if key_str.endswith(":embedding"):
+                continue
+
             keys_found += 1
             try:
                 # Get stored embedding for this key
-                embedding_key = key.decode('utf-8') + ":embedding"
+                embedding_key = key_str + ":embedding"
                 stored_embedding_bytes = client.get(embedding_key)
 
                 if stored_embedding_bytes:
@@ -251,11 +257,15 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
 
         # Check if we found a match above threshold
         if best_match and best_similarity >= similarity_threshold:
+            best_match_str = best_match.decode('utf-8') if isinstance(best_match, bytes) else best_match
+            logger.info(f"🎯 Found match above threshold! Key: '{best_match_str[:50]}...', Similarity: {best_similarity:.2%}")
             cached_response = client.get(best_match)
             if cached_response:
                 logger.info(f"✅ SEMANTIC CACHE HIT! Similarity: {best_similarity:.2%} (threshold: {similarity_threshold:.0%}) 💰")
                 logger.info(f"📊 Matched cached question, saving API costs!")
                 return cached_response.decode('utf-8')
+            else:
+                logger.error(f"❌ BUG: Found matching key but response is None! Key: '{best_match_str}'")
 
         if best_match:
             logger.info(f"❌ SEMANTIC CACHE MISS: Best similarity {best_similarity:.2%} < threshold {similarity_threshold:.0%}")
