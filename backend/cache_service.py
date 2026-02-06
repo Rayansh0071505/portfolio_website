@@ -217,11 +217,14 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
         best_match = None
         best_similarity = 0.0
 
-        # Pattern to match cache keys for this LLM
-        pattern = f"{llm_string}:*"
+        # Scan ALL cache keys (we use MD5 hashes, so can't filter by llm_string)
+        pattern = "cache:*"
+        logger.info(f"🔍 Scanning Valkey for pattern: '{pattern}'")
 
         # Scan all keys (use SCAN for production to avoid blocking)
+        keys_found = 0
         for key in client.scan_iter(match=pattern, count=100):
+            keys_found += 1
             try:
                 # Get stored embedding for this key
                 embedding_key = key.decode('utf-8') + ":embedding"
@@ -243,6 +246,8 @@ def lookup_cache(prompt: str, llm_string: str, similarity_threshold: float = 0.8
             except Exception as e:
                 logger.warning(f"⚠️ Error processing key {key}: {e}")
                 continue
+
+        logger.info(f"📊 Scanned {keys_found} cached questions, best similarity: {best_similarity:.2%}")
 
         # Check if we found a match above threshold
         if best_match and best_similarity >= similarity_threshold:
@@ -334,7 +339,8 @@ def update_cache(prompt: str, llm_string: str, response: str):
         logger.info(f"💾 SAVING TO SEMANTIC CACHE: Question → Response (question length: {len(user_question)} chars)")
 
         # Cache key based on user question ONLY (not full prompt!)
-        cache_key = cache_key_for_query(f"{llm_string}:{user_question}")
+        # Add "cache:" prefix so scan_iter can find all cache keys
+        cache_key = "cache:" + cache_key_for_query(f"{llm_string}:{user_question}")
 
         # Generate embedding for semantic search
         embeddings_model = get_cache_embeddings()
