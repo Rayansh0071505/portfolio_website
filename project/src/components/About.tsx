@@ -25,6 +25,10 @@ export default function About() {
             Solution Engineer / AI Engineer with strong experience building <span className="text-blue-400 font-semibold">production AI systems</span> for real businesses. Skilled at translating business problems into scalable AI solutions. Expert in <span className="text-teal-400 font-semibold">LLMs, automation, data pipelines, and AI architecture</span>, with proven experience working with product, operations, and leadership teams to deliver impact-driven systems.
           </p>
 
+          <p className="text-lg text-gray-300 leading-relaxed">
+            I have hands-on experience with <span className="text-purple-400 font-semibold">reinforcement learning techniques for LLM alignment</span>, including fine-tuning methods (LoRA), preference optimization (DPO), and reward-based RL (GRPO). This includes designing reward functions, hyperparameter tuning for RL training, and working with the complete pipeline from data preparation through model merging. I've also experimented with OpenAI Gym environments for classic RL problems and integrated human-in-the-loop feedback in production systems like orchestration in Peak OS and financial personal AI platforms.
+          </p>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
             {highlights.map((item, index) => (
               <div

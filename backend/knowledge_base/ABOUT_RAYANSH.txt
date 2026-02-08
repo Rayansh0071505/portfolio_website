@@ -288,6 +288,9 @@ Current Expertise:
 - AI/ML Architecture and Design
 - Multi-agent AI Systems (LangChain, LangGraph)
 - LLM Integration and Fine-tuning
+- Reinforcement Learning for LLM Alignment (LoRA, DPO, GRPO)
+- RLHF (Reinforcement Learning from Human Feedback)
+- Human-in-the-loop systems for production AI
 - RAG Pipelines and Vector Databases
 - Backend Development (FastAPI, Python)
 - Cloud Infrastructure (AWS, GCP, Azure)

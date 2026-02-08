@@ -27,6 +27,9 @@ CORE COMPETENCIES
    - Generative AI
    - Statistical Machine Learning
    - GANs (Generative Adversarial Networks)
+   - Reinforcement Learning (RL) for LLM Alignment
+   - RLHF (Reinforcement Learning from Human Feedback)
+   - Preference Optimization (DPO, GRPO)
 
 2. LANGUAGES
    - Python (Expert)
@@ -166,6 +169,19 @@ LLMs & Generative AI:
 - Voice cloning and audio synthesis
 - Video generation
 - Image generation
+
+Reinforcement Learning for LLM Alignment:
+- Fine-tuning methods: LoRA (Low-Rank Adaptation)
+- Preference optimization: DPO (Direct Preference Optimization)
+- Reward-based RL methods: GRPO (Group Relative Policy Optimization)
+- Reward function design for LLM behavior optimization
+- Hyperparameter tuning for RL training loops
+- Data preparation for preference learning and RLHF
+- Complete training pipeline: data prep through model merging
+- OpenAI Gym (Gymnasium) environments for classic RL problems
+- Understanding environment dynamics, reward design, and evaluation
+- Human-in-the-loop feedback integration in production systems
+- Applied RLHF in orchestration projects (Peak OS) and financial AI (Investment Platform)
 
 Statistical ML:
 - Regression analysis

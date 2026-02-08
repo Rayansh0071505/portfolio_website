@@ -70,6 +70,9 @@ Machine Learning:
 - Deep Learning, NLP, Computer Vision, Time Series Analysis
 - LLMs (GPT-4, Gemini, Claude, LLaMA, Mistral)
 - Generative AI, GANs, Statistical ML
+- Reinforcement Learning for LLM Alignment (LoRA, DPO, GRPO)
+- RLHF (Reinforcement Learning from Human Feedback)
+- OpenAI Gym (Gymnasium) environments for classic RL problems
 
 Frameworks & Libraries:
 - LangChain, LangGraph, LlamaIndex (Agent frameworks)
