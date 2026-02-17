@@ -18,6 +18,54 @@ from config import get_groq_api_key, get_google_key, get_mailgun_domain, get_mai
 
 logger = logging.getLogger(__name__)
 
+
+def _is_private_ip(ip: str) -> bool:
+    """Return True if the IP is private/local and should skip geolocation."""
+    if not ip or ip in ("unknown", "::1"):
+        return True
+    try:
+        parts = list(map(int, ip.split(".")))
+        if len(parts) != 4:
+            return True
+        a, b = parts[0], parts[1]
+        return (
+            a == 127 or          # 127.0.0.0/8 loopback
+            a == 10 or           # 10.0.0.0/8
+            a == 169 and b == 254 or   # 169.254.0.0/16 link-local
+            a == 192 and b == 168 or   # 192.168.0.0/16
+            a == 172 and 16 <= b <= 31  # 172.16.0.0/12
+        )
+    except Exception:
+        return True
+
+
+def get_ip_location(ip: str) -> dict:
+    """
+    Fetch approximate location for an IP using ip-api.com (free, no key needed).
+    Returns a dict with city, region, country, or empty dict on failure.
+    Skips lookup for private/local IPs.
+    """
+    if _is_private_ip(ip):
+        return {}
+    try:
+        resp = requests.get(
+            f"http://ip-api.com/json/{ip}",
+            params={"fields": "status,city,regionName,country,countryCode"},
+            timeout=5
+        )
+        data = resp.json()
+        if data.get("status") == "success":
+            return {
+                "city": data.get("city", ""),
+                "region": data.get("regionName", ""),
+                "country": data.get("country", ""),
+                "country_code": data.get("countryCode", ""),
+            }
+    except Exception as e:
+        logger.warning(f"⚠️ IP location lookup failed for {ip}: {e}")
+    return {}
+
+
 # ============================================================================
 # IN-MEMORY SESSION STORAGE (replaces Redis)
 # ============================================================================
@@ -197,6 +245,7 @@ class ConversationTracker:
                 "user_linkedin": None,
                 "user_email": None,
                 "user_ip": None,
+                "user_location": None,
                 "asked_for_name": False,
                 "asked_for_linkedin": False,
                 "started_at": datetime.now().isoformat(),
@@ -344,9 +393,13 @@ class ConversationTracker:
         logger.info(f"✅ User email set: {email}")
 
     async def set_user_ip(self, ip: str):
-        """Set user's IP address"""
-        await self.update_session(user_ip=ip)
-        logger.info(f"📍 User IP set: {ip}")
+        """Set user's IP address and fetch approximate location"""
+        location = get_ip_location(ip)
+        await self.update_session(user_ip=ip, user_location=location)
+        if location:
+            logger.info(f"📍 User IP: {ip} → {location.get('city')}, {location.get('country')}")
+        else:
+            logger.info(f"📍 User IP set: {ip}")
 
     async def get_conversation_summary(self) -> str:
         """Generate conversation summary for email"""
@@ -429,6 +482,13 @@ async def send_conversation_email(session_id: str):
         message_count = session.get("message_count", 0)
         started_at = session.get("started_at", "Unknown")
 
+        # Location
+        loc = session.get("user_location") or {}
+        if loc:
+            location_str = ", ".join(filter(None, [loc.get("city"), loc.get("region"), loc.get("country")]))
+        else:
+            location_str = "Unknown"
+
         # Generate AI summary (using Groq primary, Vertex AI backup)
         logger.info("📝 Generating AI summary for email...")
         ai_summary = generate_conversation_summary(
@@ -451,6 +511,7 @@ Name: {user_name}
 LinkedIn: {user_linkedin}
 Email: {user_email}
 IP Address: {user_ip}
+Location: {location_str}
 Session ID: {session_id}
 Total Messages: {message_count}
 Started: {started_at}
@@ -511,6 +572,10 @@ CONVERSATION TRANSCRIPT
                     <tr>
                         <td style="padding: 8px 0; color: #64748b; font-weight: 500;">IP Address:</td>
                         <td style="padding: 8px 0; color: #64748b; font-family: monospace; font-size: 13px;">{user_ip}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Location:</td>
+                        <td style="padding: 8px 0; color: #1e293b;">{location_str}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Messages:</td>
