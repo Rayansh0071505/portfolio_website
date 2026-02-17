@@ -166,6 +166,21 @@ class RequestValidator:
         r"drop\s+table",
         r"exec\(",
         r"eval\(",
+        # Prompt injection patterns
+        r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions",
+        r"disregard\s+(your\s+)?(previous|prior|above|all)\s+instructions",
+        r"forget\s+(your\s+)?(previous|prior|above|all)\s+instructions",
+        r"you\s+are\s+now\s+(a\s+)?(?!rayansh)",
+        r"act\s+as\s+(a\s+)?(?!rayansh)",
+        r"pretend\s+(you\s+are|to\s+be)",
+        r"reveal\s+(your\s+)?(system\s+prompt|instructions|prompt|tools)",
+        r"print\s+(your\s+)?(system\s+prompt|instructions)",
+        r"what\s+(are\s+your\s+instructions|is\s+your\s+system\s+prompt)",
+        r"override\s+(your\s+)?(instructions|guidelines|rules)",
+        r"bypass\s+(your\s+)?(instructions|guidelines|rules|filters)",
+        r"(do\s+not|don'?t)\s+follow\s+(your\s+)?(instructions|guidelines|rules)",
+        r"new\s+instructions?\s*:",
+        r"system\s*:\s*you\s+are",
     ]
 
     MAX_MESSAGE_LENGTH = 2000
