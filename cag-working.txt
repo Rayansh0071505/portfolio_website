@@ -1,0 +1,76 @@
+
+● Semantic Caching with Valkey - Technical Summary
+
+  How It Works
+
+  Goal: Cache LLM responses based on question meaning, not exact text.
+
+  Flow:
+  User asks: "What's your experience?"
+  ↓
+  1. Extract question from LangChain prompt (JSON parsing)
+  2. Generate 384-dim embedding vector [0.123, 0.456, ...]
+  3. Search Valkey for similar question embeddings (cosine similarity)
+  4. If similarity ≥ 85% → Return cached response (0.02s)
+  5. If similarity < 85% → Call LLM (1.5s), cache response + embedding
+
+  Valkey Storage
+
+  Two keys per cached question:
+  cache:abc123          → "I have 5+ years experience..." (response text)
+  cache:abc123:embedding → [0.123, 0.456, ...] (384-dim vector)
+
+  Lookup process:
+  1. Scan for "cache:*" (finds all response keys)
+  2. For each key, get key:embedding
+  3. Compute cosine_similarity(query_embedding, cached_embedding)
+  4. Best match ≥ 85% → Return response
+
+  Errors We Fixed
+
+  Error 1: Not extracting user question
+
+  - Problem: Cached full 13,472 char prompt (system + history + question)
+  - Fix: Parse JSON to extract last HumanMessage content
+  - Result: Cache only user question (20-50 chars)
+
+  Error 2: Pattern matching failed
+
+  - Problem: Stored keys as "abc123" (MD5), searched for "llm_string:*"
+  - Fix: Add "cache:" prefix to all keys, search "cache:*"
+  - Result: scan_iter finds cached keys
+
+  Error 3: Processing embedding keys
+
+  - Problem: Scan returned both "cache:abc123" and "cache:abc123:embedding", tried to use embedding key as response
+  - Fix: Skip keys ending with ":embedding"
+  - Result: Only process response keys, correct data returned
+
+  Error 4: Disk space on EC2
+
+  - Problem: Docker images filled 27GB, deployment failed
+  - Fix: Auto-cleanup before pull: docker system prune -a -f --volumes
+  - Result: Frees ~30% disk, deployment succeeds
+
+  Implementation Steps
+
+  1. Setup Valkey (Terraform)
+    - Created ElastiCache replication group with Valkey 8.2
+    - Stored endpoint in Parameter Store
+  2. Embeddings Model
+    - HuggingFace: sentence-transformers/all-MiniLM-L6-v2 (384-dim)
+  3. Cache Functions
+  lookup_cache()  # Search by semantic similarity
+  update_cache()  # Store response + embedding
+  extract_user_question()  # Parse JSON prompt
+  should_cache()  # Filter personal info
+  4. LangChain Integration
+  cache = ValkeyCache()  # Custom cache class
+  set_llm_cache(cache)   # Global LLM cache
+
+  Results
+
+  - Cache hit: 0.02s (76x faster)
+  - Semantic matching: "whats your work experience?" ≈ "work experience?" (88% similarity)
+  - Cost savings: $0 per cached response vs $0.002 per LLM call
+  - Full automation: Auto-deploy on push, auto-cleanup, auto-config
