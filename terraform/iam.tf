@@ -41,7 +41,7 @@ resource "aws_iam_role_policy" "backend_parameter_store" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath"
         ]
-        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project_name}/*"
+        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/personal_portfolio/*"
       }
     ]
   })

@@ -94,6 +94,8 @@ services:
     container_name: backend_api
     ports:
       - "${BACKEND_PORT}:8080"
+    env_file:
+      - /opt/backend/.env
     environment:
       - ENVIRONMENT=production
       - REDIS_URL=redis://redis:6379
