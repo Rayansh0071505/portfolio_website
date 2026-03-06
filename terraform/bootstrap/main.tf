@@ -89,6 +89,37 @@ output "bucket_arn" {
   value       = aws_s3_bucket.terraform_state.arn
 }
 
+variable "github_actions_user" {
+  description = "IAM username used by GitHub Actions"
+  type        = string
+  default     = ""
+}
+
+resource "aws_iam_user_policy" "github_actions_terraform_state" {
+  count = var.github_actions_user != "" ? 1 : 0
+  name  = "terraform-state-access"
+  user  = var.github_actions_user
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.terraform_state.arn,
+          "${aws_s3_bucket.terraform_state.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
 output "next_steps" {
   description = "Next steps"
   value       = <<-EOT
